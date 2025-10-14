@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package example;
+
+option go_package = "github.com/sunerpy/protoc-gen-jsonschema/example/pb;pb";
+
+import "mcp/jsonschema/jsonschema.proto";
+
+message UserRequest {
+  option (mcp.jsonschema.title) = "User Request";
+  option (mcp.jsonschema.message_description) = "Request to create or update a user";
+
+  // User's email address
+  string email = 1 [
+    (mcp.jsonschema.required) = true,
+    (mcp.jsonschema.format) = "email",
+    (mcp.jsonschema.description) = "User's email address",
+    (mcp.jsonschema.example) = "user@example.com"
+  ];
+  
+  // User's full name (3-50 characters)
+  string name = 2 [
+    (mcp.jsonschema.required) = true,
+    (mcp.jsonschema.min_length) = 3,
+    (mcp.jsonschema.max_length) = 50,
+    (mcp.jsonschema.description) = "User's full name",
+    (mcp.jsonschema.example) = "John Doe"
+  ];
+  
+  // User's age (must be 18-120)
+  int32 age = 3 [
+    (mcp.jsonschema.minimum) = 18,
+    (mcp.jsonschema.maximum) = 120,
+    (mcp.jsonschema.description) = "User's age in years"
+  ];
+  
+  // User's phone number (optional)
+  string phone = 4 [
+    (mcp.jsonschema.pattern) = "^\\+?[1-9]\\d{1,14}$",
+    (mcp.jsonschema.description) = "User's phone number in E.164 format",
+    (mcp.jsonschema.example) = "+1234567890"
+  ];
+}
