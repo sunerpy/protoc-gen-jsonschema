@@ -31,72 +31,103 @@ func NewGenerator() *Generator {
 func (g *Generator) GenerateSchema(md protoreflect.MessageDescriptor) (Schema, error) {
 	msgOpts := md.Options().(*descriptorpb.MessageOptions)
 	
-	// Check if schema generation is disabled
-	if proto.HasExtension(msgOpts, jsonschemapb.E_GenerateSchema) {
-		if !proto.GetExtension(msgOpts, jsonschemapb.E_GenerateSchema).(bool) {
-			return nil, nil
-		}
+	if !g.shouldGenerateSchema(msgOpts) {
+		return nil, nil
 	}
 
-	schema := Schema{
-		"type":       "object",
-		"properties": make(map[string]interface{}),
-	}
-
-	// Set title
-	if proto.HasExtension(msgOpts, jsonschemapb.E_Title) {
-		schema["title"] = proto.GetExtension(msgOpts, jsonschemapb.E_Title).(string)
-	} else {
-		schema["title"] = string(md.Name())
-	}
-
-	// Set description
-	if proto.HasExtension(msgOpts, jsonschemapb.E_MessageDescription) {
-		schema["description"] = proto.GetExtension(msgOpts, jsonschemapb.E_MessageDescription).(string)
-	}
-
-	required := []string{}
-	properties := make(map[string]interface{})
-
-	// Process fields
-	fields := md.Fields()
-	for i := 0; i < fields.Len(); i++ {
-		field := fields.Get(i)
-		fieldOpts := field.Options().(*descriptorpb.FieldOptions)
-
-		// Check if field is hidden
-		if proto.HasExtension(fieldOpts, jsonschemapb.E_Hidden) {
-			if proto.GetExtension(fieldOpts, jsonschemapb.E_Hidden).(bool) {
-				continue
-			}
-		}
-
-		fieldName := string(field.Name())
-		
-		// Use custom JSON name if specified
-		if proto.HasExtension(fieldOpts, jsonschemapb.E_JsonName) {
-			fieldName = proto.GetExtension(fieldOpts, jsonschemapb.E_JsonName).(string)
-		} else if field.JSONName() != "" {
-			fieldName = field.JSONName()
-		}
-
-		fieldSchema := g.generateFieldSchema(field, fieldOpts)
-		properties[fieldName] = fieldSchema
-
-		// Check if field is required
-		if proto.HasExtension(fieldOpts, jsonschemapb.E_Required) {
-			if proto.GetExtension(fieldOpts, jsonschemapb.E_Required).(bool) {
-				required = append(required, fieldName)
-			}
-		}
-	}
-
+	schema := g.createBaseSchema(md, msgOpts)
+	properties, required := g.processFields(md.Fields())
+	
 	schema["properties"] = properties
 	if len(required) > 0 {
 		schema["required"] = required
 	}
 
 	return schema, nil
+}
+
+// shouldGenerateSchema checks if schema generation is enabled
+func (g *Generator) shouldGenerateSchema(msgOpts *descriptorpb.MessageOptions) bool {
+	if proto.HasExtension(msgOpts, jsonschemapb.E_GenerateSchema) {
+		return proto.GetExtension(msgOpts, jsonschemapb.E_GenerateSchema).(bool)
+	}
+	return true
+}
+
+// createBaseSchema creates the base schema with title and description
+func (g *Generator) createBaseSchema(md protoreflect.MessageDescriptor, msgOpts *descriptorpb.MessageOptions) Schema {
+	schema := Schema{
+		"type":       "object",
+		"properties": make(map[string]interface{}),
+	}
+
+	schema["title"] = g.getSchemaTitle(md, msgOpts)
+	
+	if proto.HasExtension(msgOpts, jsonschemapb.E_MessageDescription) {
+		schema["description"] = proto.GetExtension(msgOpts, jsonschemapb.E_MessageDescription).(string)
+	}
+
+	return schema
+}
+
+// getSchemaTitle returns the schema title from options or message name
+func (g *Generator) getSchemaTitle(md protoreflect.MessageDescriptor, msgOpts *descriptorpb.MessageOptions) string {
+	if proto.HasExtension(msgOpts, jsonschemapb.E_Title) {
+		return proto.GetExtension(msgOpts, jsonschemapb.E_Title).(string)
+	}
+	return string(md.Name())
+}
+
+// processFields processes all fields and returns properties and required fields
+func (g *Generator) processFields(fields protoreflect.FieldDescriptors) (map[string]interface{}, []string) {
+	properties := make(map[string]interface{})
+	required := []string{}
+
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		fieldOpts := field.Options().(*descriptorpb.FieldOptions)
+
+		if g.isFieldHidden(fieldOpts) {
+			continue
+		}
+
+		fieldName := g.getFieldName(field, fieldOpts)
+		fieldSchema := g.generateFieldSchema(field, fieldOpts)
+		properties[fieldName] = fieldSchema
+
+		if g.isFieldRequired(fieldOpts) {
+			required = append(required, fieldName)
+		}
+	}
+
+	return properties, required
+}
+
+// isFieldHidden checks if a field should be hidden
+func (g *Generator) isFieldHidden(fieldOpts *descriptorpb.FieldOptions) bool {
+	if proto.HasExtension(fieldOpts, jsonschemapb.E_Hidden) {
+		return proto.GetExtension(fieldOpts, jsonschemapb.E_Hidden).(bool)
+	}
+	return false
+}
+
+// getFieldName returns the JSON name for a field
+func (g *Generator) getFieldName(field protoreflect.FieldDescriptor, fieldOpts *descriptorpb.FieldOptions) string {
+	if proto.HasExtension(fieldOpts, jsonschemapb.E_JsonName) {
+		return proto.GetExtension(fieldOpts, jsonschemapb.E_JsonName).(string)
+	}
+	if field.JSONName() != "" {
+		return field.JSONName()
+	}
+	return string(field.Name())
+}
+
+// isFieldRequired checks if a field is required
+func (g *Generator) isFieldRequired(fieldOpts *descriptorpb.FieldOptions) bool {
+	if proto.HasExtension(fieldOpts, jsonschemapb.E_Required) {
+		return proto.GetExtension(fieldOpts, jsonschemapb.E_Required).(bool)
+	}
+	return false
 }
 
 // generateFieldSchema generates JSON Schema for a field

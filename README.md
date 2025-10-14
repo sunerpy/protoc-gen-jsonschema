@@ -1,24 +1,24 @@
 # protoc-gen-jsonschema
 
-[English](#english) | [中文](#中文)
+将 Protocol Buffers 消息转换为 JSON Schema 的 Buf 模块。
 
----
+## 功能特性
 
-## English
+- 🎯 通过 Protobuf 扩展选项定义 JSON Schema 约束
+- 📦 作为 Buf 模块发布到 BSR (buf.build/sunerpy/protoc-gen-jsonschema)
+- 🔧 支持字段级和消息级的 JSON Schema 选项
+- ✨ 简单易用的 API
 
-A Buf module providing Protocol Buffer extension options for JSON Schema validation, designed for MCP (Model Context Protocol) integration.
+## 安装
 
-### Features
+在你的项目中添加依赖：
 
-- ✅ **Field-level Options** - Rich set of validation options for individual fields
-- ✅ **Message-level Options** - Control schema generation at message level
-- ✅ **Standard Compliance** - Follows JSON Schema specification
-- ✅ **Easy Integration** - Simple import and use in your proto files
-- ✅ **MCP Ready** - Perfect for Model Context Protocol tools
+```bash
+# 在 buf.yaml 中添加依赖
+buf dep update
+```
 
-### Installation
-
-Add the module as a dependency in your `buf.yaml`:
+在 `buf.yaml` 中配置：
 
 ```yaml
 version: v2
@@ -26,36 +26,33 @@ deps:
   - buf.build/sunerpy/protoc-gen-jsonschema
 ```
 
-Update dependencies:
+## 使用方法
 
-```bash
-buf dep update
-```
-
-### Quick Start
-
-Import the options in your `.proto` file:
+### 1. 在 Proto 文件中使用扩展选项
 
 ```protobuf
 syntax = "proto3";
 
+package example;
+
 import "mcp/jsonschema/jsonschema.proto";
 
 message UserRequest {
-  // User's email address
+  option (mcp.jsonschema.title) = "User Request";
+  option (mcp.jsonschema.message_description) = "Request to create or update a user";
+
   string email = 1 [
     (mcp.jsonschema.required) = true,
-    (mcp.jsonschema.format) = "email"
+    (mcp.jsonschema.format) = "email",
+    (mcp.jsonschema.description) = "User's email address"
   ];
   
-  // User's name (3-50 characters)
   string name = 2 [
     (mcp.jsonschema.required) = true,
     (mcp.jsonschema.min_length) = 3,
     (mcp.jsonschema.max_length) = 50
   ];
   
-  // User's age (18-120)
   int32 age = 3 [
     (mcp.jsonschema.minimum) = 18,
     (mcp.jsonschema.maximum) = 120
@@ -63,141 +60,90 @@ message UserRequest {
 }
 ```
 
-### Available Options
+### 2. 在 Go 代码中生成 JSON Schema
 
-#### Field Options
+```go
+package main
 
-| Option | Type | Description | Example |
-|--------|------|-------------|---------|
-| `required` | bool | Mark field as required | `true` |
-| `description` | string | Custom description | `"User ID"` |
-| `example` | string | Example value | `"user@example.com"` |
-| `format` | string | JSON Schema format | `"email"`, `"uuid"`, `"uri"` |
-| `default` | string | Default value (JSON string) | `"\"en-US\""` |
-| `min_length` | int32 | Minimum length (string) | `3` |
-| `max_length` | int32 | Maximum length (string) | `100` |
-| `minimum` | double | Minimum value (number) | `0` |
-| `maximum` | double | Maximum value (number) | `100` |
-| `pattern` | string | Regex pattern | `"^[A-Z]+$"` |
-| `hidden` | bool | Hide field from schema | `true` |
-| `json_name` | string | Custom JSON field name | `"userId"` |
+import (
+    "encoding/json"
+    "fmt"
+    
+    pb "your-module/pb"
+    "github.com/sunerpy/protoc-gen-jsonschema/generator"
+)
 
-#### Message Options
-
-| Option | Type | Description | Example |
-|--------|------|-------------|---------|
-| `message_description` | string | Message description | `"User registration request"` |
-| `generate_schema` | bool | Whether to generate schema | `true` |
-| `title` | string | Schema title | `"User Request"` |
-
-### Use Cases
-
-- **API Validation** - Define validation rules in protobuf
-- **Documentation** - Auto-generate API documentation
-- **Code Generation** - Generate validation code from proto definitions
-- **MCP Integration** - Use with Model Context Protocol tools
-
-### Module Information
-
-- **Module Name**: `buf.build/sunerpy/protoc-gen-jsonschema`
-- **Package**: `mcp.jsonschema`
-- **Import Path**: `mcp/jsonschema/jsonschema.proto`
-- **Go Package**: `github.com/sunerpy/protoc-gen-jsonschema/mcp/jsonschema`
-
-### License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-## 中文
-
-一个提供 Protocol Buffer 扩展选项的 Buf 模块，用于 JSON Schema 验证，专为 MCP (Model Context Protocol) 集成设计。
-
-### 特性
-
-- ✅ **字段级选项** - 丰富的字段验证选项
-- ✅ **消息级选项** - 在消息级别控制 schema 生成
-- ✅ **标准兼容** - 遵循 JSON Schema 规范
-- ✅ **易于集成** - 在 proto 文件中简单导入使用
-- ✅ **MCP 就绪** - 完美适配 Model Context Protocol 工具
-
-### 安装
-
-在 `buf.yaml` 中添加模块依赖：
-
-```yaml
-version: v2
-deps:
-  - buf.build/sunerpy/protoc-gen-jsonschema
-```
-
-更新依赖：
-
-```bash
-buf dep update
-```
-
-### 快速开始
-
-在 `.proto` 文件中导入选项：
-
-```protobuf
-syntax = "proto3";
-
-import "mcp/jsonschema/jsonschema.proto";
-
-message UserRequest {
-  // 用户邮箱
-  string email = 1 [
-    (mcp.jsonschema.required) = true,
-    (mcp.jsonschema.format) = "email"
-  ];
-  
-  // 用户名（3-50 字符）
-  string name = 2 [
-    (mcp.jsonschema.required) = true,
-    (mcp.jsonschema.min_length) = 3,
-    (mcp.jsonschema.max_length) = 50
-  ];
-  
-  // 用户年龄（18-120）
-  int32 age = 3 [
-    (mcp.jsonschema.minimum) = 18,
-    (mcp.jsonschema.maximum) = 120
-  ];
+func main() {
+    user := &pb.UserRequest{}
+    schema, err := generator.GenerateSchema(user)
+    if err != nil {
+        panic(err)
+    }
+    
+    jsonBytes, _ := json.MarshalIndent(schema, "", "  ")
+    fmt.Println(string(jsonBytes))
 }
 ```
 
-### 可用选项
+## 支持的选项
 
-#### 字段选项
+### 字段选项 (FieldOptions)
 
-| 选项 | 类型 | 说明 | 示例 |
-|------|------|------|------|
-| `required` | bool | 标记为必填字段 | `true` |
-| `description` | string | 自定义描述 | `"用户ID"` |
-| `example` | string | 示例值 | `"user@example.com"` |
-| `format` | string | JSON Schema 格式 | `"email"`, `"uuid"`, `"uri"` |
-| `default` | string | 默认值（JSON 字符串） | `"\"zh-CN\""` |
-| `min_length` | int32 | 最小长度（字符串） | `3` |
-| `max_length` | int32 | 最大长度（字符串） | `100` |
-| `minimum` | double | 最小值（数值） | `0` |
-| `maximum` | double | 最大值（数值） | `100` |
-| `pattern` | string | 正则表达式模式 | `"^[A-Z]+$"` |
-| `hidden` | bool | 隐藏字段 | `true` |
-| `json_name` | string | 自定义 JSON 字段名 | `"userId"` |
+- `required` (bool) - 标记字段为必填
+- `description` (string) - 字段描述
+- `example` (string) - 示例值
+- `format` (string) - 格式约束 (如 "email", "uri")
+- `pattern` (string) - 正则表达式模式
+- `min_length` (int32) - 最小长度
+- `max_length` (int32) - 最大长度
+- `minimum` (double) - 最小值
+- `maximum` (double) - 最大值
+- `exclusive_minimum` (double) - 独占最小值
+- `exclusive_maximum` (double) - 独占最大值
+- `multiple_of` (double) - 倍数约束
 
-#### 消息选项
+### 消息选项 (MessageOptions)
 
-| 选项 | 类型 | 说明 | 示例 |
-|------|------|------|------|
-| `message_description` | string | 消息描述 | `"用户注册请求"` |
-| `generate_schema` | bool | 是否生成 schema | `true` |
-| `title` | string | Schema 标题 | `"用户请求"` |
+- `title` (string) - Schema 标题
+- `message_description` (string) - Schema 描述
+- `additional_properties` (bool) - 是否允许额外属性
 
-### 使用场景
+## 示例输出
 
-- **API 验证** - 在 protobuf 中定义验证规则
-- **文档生成** - 自动生成 API 文档
-- **代码生成** - 从
+```json
+{
+  "type": "object",
+  "title": "User Request",
+  "description": "Request to create or update a user",
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "User's email address"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 50
+    },
+    "age": {
+      "type": "integer",
+      "minimum": 18,
+      "maximum": 120
+    }
+  },
+  "required": ["email", "name"]
+}
+```
+
+## 运行示例
+
+```bash
+cd example
+buf generate
+go run main.go
+```
+
+## 许可证
+
+MIT License

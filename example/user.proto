@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package example;
 
-option go_package = "github.com/sunerpy/protoc-gen-jsonschema/example/pb;pb";
+option go_package = "example/pb;pb";
 
 import "mcp/jsonschema/jsonschema.proto";
 
