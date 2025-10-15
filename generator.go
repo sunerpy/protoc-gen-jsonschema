@@ -3,6 +3,7 @@ package jsonschema
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -16,7 +17,8 @@ type Schema map[string]interface{}
 
 // Generator generates JSON Schema from protobuf messages
 type Generator struct {
-	schemas map[string]Schema
+	schemas       map[string]Schema
+	preserveOrder bool
 }
 
 // NewGenerator creates a new Generator
@@ -24,6 +26,24 @@ func NewGenerator() *Generator {
 	return &Generator{
 		schemas: make(map[string]Schema),
 	}
+}
+
+// NewGeneratorWithOptions creates a new Generator with options
+func NewGeneratorWithOptions(preserveOrder bool) *Generator {
+	return &Generator{
+		schemas:       make(map[string]Schema),
+		preserveOrder: preserveOrder,
+	}
+}
+
+// SetPreserveOrder sets whether to preserve field order
+func (g *Generator) SetPreserveOrder(preserve bool) {
+	g.preserveOrder = preserve
+}
+
+// IsPreserveOrder returns whether field order preservation is enabled
+func (g *Generator) IsPreserveOrder() bool {
+	return g.preserveOrder
 }
 
 // GenerateSchema generates JSON Schema for a message descriptor
@@ -43,6 +63,51 @@ func (g *Generator) GenerateSchema(md protoreflect.MessageDescriptor) (Schema, e
 	}
 
 	return schema, nil
+}
+
+// GenerateOrderedSchema generates an ordered JSON Schema for a message descriptor
+func (g *Generator) GenerateOrderedSchema(md protoreflect.MessageDescriptor) (*OrderedSchema, error) {
+	msgOpts := md.Options().(*descriptorpb.MessageOptions)
+
+	if !g.shouldGenerateSchema(msgOpts) {
+		return nil, nil
+	}
+
+	orderedSchema := &OrderedSchema{
+		Type:       "object",
+		Title:      g.getSchemaTitle(md, msgOpts),
+		Properties: []OrderedProperty{},
+		Required:   []string{},
+	}
+
+	if proto.HasExtension(msgOpts, jsonschemapb.E_MessageDescription) {
+		orderedSchema.Description = proto.GetExtension(msgOpts, jsonschemapb.E_MessageDescription).(string)
+	}
+
+	// Process fields in order
+	fields := md.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		fieldOpts := field.Options().(*descriptorpb.FieldOptions)
+
+		if g.isFieldHidden(fieldOpts) {
+			continue
+		}
+
+		fieldName := g.getFieldName(field, fieldOpts)
+		fieldSchema := g.generateFieldSchema(field, fieldOpts)
+		
+		orderedSchema.Properties = append(orderedSchema.Properties, OrderedProperty{
+			Name:   fieldName,
+			Schema: fieldSchema,
+		})
+
+		if g.isFieldRequired(fieldOpts) {
+			orderedSchema.Required = append(orderedSchema.Required, fieldName)
+		}
+	}
+
+	return orderedSchema, nil
 }
 
 // shouldGenerateSchema checks if schema generation is enabled
@@ -230,6 +295,98 @@ func (s Schema) ToJSONBytes() ([]byte, error) {
 		return nil, fmt.Errorf("failed to marshal schema: %w", err)
 	}
 	return data, nil
+}
+
+// OrderedSchema represents a JSON Schema with ordered fields
+type OrderedSchema struct {
+	Type        string
+	Title       string
+	Description string
+	Properties  []OrderedProperty
+	Required    []string
+}
+
+// OrderedProperty represents an ordered property
+type OrderedProperty struct {
+	Name   string
+	Schema map[string]interface{}
+}
+
+// MarshalJSON implements custom JSON marshaling for OrderedSchema
+func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
+	var buf strings.Builder
+	buf.WriteString("{")
+	
+	first := true
+	
+	// type
+	if os.Type != "" {
+		buf.WriteString(`"type":"`)
+		buf.WriteString(os.Type)
+		buf.WriteString(`"`)
+		first = false
+	}
+	
+	// title
+	if os.Title != "" {
+		if !first {
+			buf.WriteString(",")
+		}
+		buf.WriteString(`"title":"`)
+		buf.WriteString(os.Title)
+		buf.WriteString(`"`)
+		first = false
+	}
+	
+	// description
+	if os.Description != "" {
+		if !first {
+			buf.WriteString(",")
+		}
+		buf.WriteString(`"description":"`)
+		buf.WriteString(os.Description)
+		buf.WriteString(`"`)
+		first = false
+	}
+	
+	// properties
+	if len(os.Properties) > 0 {
+		if !first {
+			buf.WriteString(",")
+		}
+		buf.WriteString(`"properties":{`)
+		for i, prop := range os.Properties {
+			if i > 0 {
+				buf.WriteString(",")
+			}
+			buf.WriteString(`"`)
+			buf.WriteString(prop.Name)
+			buf.WriteString(`":`)
+			propJSON, err := json.Marshal(prop.Schema)
+			if err != nil {
+				return nil, err
+			}
+			buf.Write(propJSON)
+		}
+		buf.WriteString("}")
+		first = false
+	}
+	
+	// required
+	if len(os.Required) > 0 {
+		if !first {
+			buf.WriteString(",")
+		}
+		reqJSON, err := json.Marshal(os.Required)
+		if err != nil {
+			return nil, err
+		}
+		buf.WriteString(`"required":`)
+		buf.Write(reqJSON)
+	}
+	
+	buf.WriteString("}")
+	return []byte(buf.String()), nil
 }
 
 // GenerateFromMessage generates JSON Schema from a protobuf message

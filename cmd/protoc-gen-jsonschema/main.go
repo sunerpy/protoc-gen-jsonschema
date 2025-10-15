@@ -69,8 +69,9 @@ func main() {
 }
 
 type genParams struct {
-	format string // "json" or "go_const"
-	suffix string // file suffix for go_const format
+	format        string // "json" or "go_const"
+	suffix        string // file suffix for go_const format
+	preserveOrder bool   // preserve field order from proto definition
 }
 
 func parseParameters(param string) genParams {
@@ -97,6 +98,8 @@ func parseParameters(param string) genParams {
 			params.format = value
 		case "suffix":
 			params.suffix = value
+		case "preserve_order":
+			params.preserveOrder = value == "true"
 		}
 	}
 
@@ -105,6 +108,7 @@ func parseParameters(param string) genParams {
 
 func generate(plugin *protogen.Plugin, params genParams) error {
 	gen := jsonschema.NewGenerator()
+	gen.SetPreserveOrder(params.preserveOrder)
 
 	for _, file := range plugin.Files {
 		if !file.Generate {
@@ -114,7 +118,7 @@ func generate(plugin *protogen.Plugin, params genParams) error {
 		// Generate based on format parameter
 		switch params.format {
 		case "go_const":
-			if err := generateGoConstFile(plugin, gen, file, params.suffix); err != nil {
+			if err := generateGoConstFile(plugin, gen, file, params); err != nil {
 				return fmt.Errorf("failed to generate go const for %s: %w", file.Desc.Path(), err)
 			}
 		case "json":
@@ -129,13 +133,13 @@ func generate(plugin *protogen.Plugin, params genParams) error {
 	return nil
 }
 
-func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, file *protogen.File, suffix string) error {
+func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, file *protogen.File, params genParams) error {
 	if len(file.Messages) == 0 {
 		return nil
 	}
 
 	// Create output filename: user.proto -> user_jsonschema.pb.go
-	filename := strings.TrimSuffix(file.Desc.Path(), ".proto") + suffix + ".pb.go"
+	filename := strings.TrimSuffix(file.Desc.Path(), ".proto") + params.suffix + ".pb.go"
 	g := plugin.NewGeneratedFile(filename, file.GoImportPath)
 
 	// File header
@@ -158,21 +162,36 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 }
 
 func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, message *protogen.Message) error {
-	// Generate JSON Schema
-	schema, err := gen.GenerateSchema(message.Desc)
-	if err != nil {
-		return err
+	var jsonStr string
+	
+	// Generate JSON Schema based on preserveOrder setting
+	if gen.IsPreserveOrder() {
+		orderedSchema, err := gen.GenerateOrderedSchema(message.Desc)
+		if err != nil {
+			return err
+		}
+		if orderedSchema == nil {
+			return nil
+		}
+		jsonBytes, err := json.Marshal(orderedSchema)
+		if err != nil {
+			return fmt.Errorf("failed to marshal ordered schema: %w", err)
+		}
+		jsonStr = string(jsonBytes)
+	} else {
+		schema, err := gen.GenerateSchema(message.Desc)
+		if err != nil {
+			return err
+		}
+		if schema == nil {
+			return nil
+		}
+		jsonBytes, err := json.Marshal(schema)
+		if err != nil {
+			return fmt.Errorf("failed to marshal schema: %w", err)
+		}
+		jsonStr = string(jsonBytes)
 	}
-
-	if schema == nil {
-		return nil
-	}
-
-	jsonBytes, err := json.Marshal(schema)
-	if err != nil {
-		return fmt.Errorf("failed to marshal schema: %w", err)
-	}
-	jsonStr := string(jsonBytes)
 
 	// Constant name: UserRequest -> userRequestSchemaJSON
 	constName := toLowerCamelCase(message.GoIdent.GoName) + "SchemaJSON"
