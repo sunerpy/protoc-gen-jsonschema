@@ -72,7 +72,8 @@ type genParams struct {
 	format        string // "json" or "go_const"
 	suffix        string // file suffix for go_const format
 	preserveOrder bool   // preserve field order from proto definition
-	schemaStruct  bool   // generate jsonschema.Schema struct literal (compile-time, zero parsing)
+	schemaStruct  bool   // generate jsonschema.Schema struct literal (map[string]interface{})
+	googleSchema  bool   // generate Google jsonschema.Schema struct literal (*jsonschema.Schema)
 }
 
 func parseParameters(param string) genParams {
@@ -103,6 +104,8 @@ func parseParameters(param string) genParams {
 			params.preserveOrder = value == "true"
 		case "schema_struct":
 			params.schemaStruct = value == "true"
+		case "google_schema":
+			params.googleSchema = value == "true"
 		}
 	}
 
@@ -151,11 +154,16 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 	g.P()
 	g.P("package ", file.GoPackageName)
 	g.P()
-	if params.schemaStruct {
+	if params.schemaStruct || params.googleSchema {
 		g.P("import (")
 		g.P("\t\"encoding/json\"")
 		g.P()
-		g.P("\tjsonschema \"github.com/sunerpy/protoc-gen-jsonschema\"")
+		if params.schemaStruct {
+			g.P("\tlocalschema \"github.com/sunerpy/protoc-gen-jsonschema\"")
+		}
+		if params.googleSchema {
+			g.P("\t\"github.com/google/jsonschema-go/jsonschema\"")
+		}
 		g.P(")")
 	} else {
 		g.P("import \"encoding/json\"")
@@ -165,7 +173,7 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 	// Generate methods and constants for each message
 	for _, message := range file.Messages {
 		if shouldGenerateSchema(message) {
-			if err := generateMessageConst(g, gen, message, params.schemaStruct); err != nil {
+			if err := generateMessageConst(g, gen, message, params.schemaStruct, params.googleSchema); err != nil {
 				return fmt.Errorf("failed to generate const for %s: %w", message.Desc.FullName(), err)
 			}
 		}
@@ -174,7 +182,7 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 	return nil
 }
 
-func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, message *protogen.Message, schemaStruct bool) error {
+func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, message *protogen.Message, schemaStruct bool, googleSchema bool) error {
 	var jsonStr string
 
 	// Generate JSON Schema based on preserveOrder setting
@@ -240,7 +248,7 @@ func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, 
 	g.P("const ", constName, " = `", jsonStr, "`")
 	g.P()
 
-	// Generate jsonschema.Schema struct literal if requested
+	// Generate localschema.Schema struct literal if requested
 	if schemaStruct {
 		varName := toLowerCamelCase(message.GoIdent.GoName) + "Schema"
 
@@ -261,7 +269,36 @@ func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, 
 		g.P("// Unlike GetJSONSchema() which returns a string that needs json.Unmarshal,")
 		g.P("// this method returns a pre-built struct with zero parsing overhead")
 		g.P("// Performance: Direct variable access, zero allocation, zero parsing")
-		g.P("func (*", typeName, ") GetSchema() jsonschema.Schema {")
+		g.P("func (*", typeName, ") GetSchema() localschema.Schema {")
+		g.P("\treturn ", varName)
+		g.P("}")
+		g.P()
+	}
+
+	// Generate Google jsonschema.Schema struct literal if requested
+	if googleSchema {
+		varName := toLowerCamelCase(message.GoIdent.GoName) + "GoogleSchema"
+
+		// Parse the JSON to get the schema structure
+		var schemaMap map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonStr), &schemaMap); err != nil {
+			return fmt.Errorf("failed to unmarshal schema for code generation: %w", err)
+		}
+
+		g.P("// ", varName, " is the compile-time Google JSON Schema for ", typeName)
+		g.P("// This is a Google jsonschema.Schema struct literal, requiring zero runtime parsing")
+		g.P("// Can be used directly with github.com/google/jsonschema-go for validation")
+		g.P("// Performance: Direct struct access, zero initialization overhead, zero parsing cost")
+		g.P("var ", varName, " = ", generateGoogleSchemaLiteral(schemaMap, 0))
+		g.P()
+
+		// Generate GetGoogleSchema method
+		g.P("// GetGoogleSchema returns the compile-time Google JSON Schema struct for ", typeName)
+		g.P("// Unlike GetJSONSchema() which returns a string that needs json.Unmarshal,")
+		g.P("// this method returns a pre-built Google jsonschema.Schema struct with zero parsing overhead")
+		g.P("// Can be used directly for validation with github.com/google/jsonschema-go")
+		g.P("// Performance: Direct variable access, zero allocation, zero parsing")
+		g.P("func (*", typeName, ") GetGoogleSchema() *jsonschema.Schema {")
 		g.P("\treturn ", varName)
 		g.P("}")
 		g.P()
@@ -336,6 +373,124 @@ func generateValueLiteral(v interface{}, indent int) string {
 	default:
 		return fmt.Sprintf("%#v", val)
 	}
+}
+
+// generateGoogleSchemaLiteral converts a map[string]interface{} to Google jsonschema.Schema literal
+func generateGoogleSchemaLiteral(m map[string]interface{}, indent int) string {
+	var sb strings.Builder
+	sb.WriteString("&jsonschema.Schema{\n")
+	indentStr := strings.Repeat("\t", indent+1)
+
+	// Type
+	if typeVal, ok := m["type"].(string); ok {
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("Type: %q,\n", typeVal))
+	}
+
+	// Title
+	if title, ok := m["title"].(string); ok {
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("Title: %q,\n", title))
+	}
+
+	// Description
+	if desc, ok := m["description"].(string); ok {
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("Description: %q,\n", desc))
+	}
+
+	// Format
+	if format, ok := m["format"].(string); ok {
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("Format: %q,\n", format))
+	}
+
+	// Pattern
+	if pattern, ok := m["pattern"].(string); ok {
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("Pattern: %q,\n", pattern))
+	}
+
+	// MinLength
+	if minLen, ok := m["minLength"].(float64); ok {
+		val := int(minLen)
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("MinLength: &[]int{%d}[0],\n", val))
+	}
+
+	// MaxLength
+	if maxLen, ok := m["maxLength"].(float64); ok {
+		val := int(maxLen)
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("MaxLength: &[]int{%d}[0],\n", val))
+	}
+
+	// Minimum
+	if min, ok := m["minimum"].(float64); ok {
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("Minimum: &[]float64{%v}[0],\n", min))
+	}
+
+	// Maximum
+	if max, ok := m["maximum"].(float64); ok {
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("Maximum: &[]float64{%v}[0],\n", max))
+	}
+
+	// Enum
+	if enum, ok := m["enum"].([]interface{}); ok && len(enum) > 0 {
+		sb.WriteString(indentStr)
+		sb.WriteString("Enum: []any{")
+		for i, e := range enum {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("%q", e))
+		}
+		sb.WriteString("},\n")
+	}
+
+	// Properties
+	if props, ok := m["properties"].(map[string]interface{}); ok && len(props) > 0 {
+		sb.WriteString(indentStr)
+		sb.WriteString("Properties: map[string]*jsonschema.Schema{\n")
+		for key, val := range props {
+			if propMap, ok := val.(map[string]interface{}); ok {
+				sb.WriteString(strings.Repeat("\t", indent+2))
+				sb.WriteString(fmt.Sprintf("%q: ", key))
+				sb.WriteString(generateGoogleSchemaLiteral(propMap, indent+2))
+				sb.WriteString(",\n")
+			}
+		}
+		sb.WriteString(indentStr)
+		sb.WriteString("},\n")
+	}
+
+	// Required
+	if required, ok := m["required"].([]interface{}); ok && len(required) > 0 {
+		sb.WriteString(indentStr)
+		sb.WriteString("Required: []string{")
+		for i, r := range required {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("%q", r))
+		}
+		sb.WriteString("},\n")
+	}
+
+	// Items (for arrays)
+	if items, ok := m["items"].(map[string]interface{}); ok {
+		sb.WriteString(indentStr)
+		sb.WriteString("Items: ")
+		sb.WriteString(generateGoogleSchemaLiteral(items, indent+1))
+		sb.WriteString(",\n")
+	}
+
+	sb.WriteString(strings.Repeat("\t", indent))
+	sb.WriteString("}")
+
+	return sb.String()
 }
 
 func toLowerCamelCase(s string) string {

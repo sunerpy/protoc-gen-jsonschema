@@ -26,7 +26,7 @@ plugins:
       - format=go_const        # 生成 Go 常量而非 JSON 文件
       - suffix=_jsonschema     # 生成文件后缀（可选，默认 _jsonschema）
       - preserve_order=true    # 保持字段顺序
-      - schema_struct=true     # 生成 Schema 结构体字面量（编译时，零解析开销）
+      - google_schema=true     # 生成 Google jsonschema.Schema 结构体字面量（编译时，零解析开销）
 
   # # 1. 生成 _pb2.py  和 _pb2.pyi
   # - remote: buf.build/protocolbuffers/python
