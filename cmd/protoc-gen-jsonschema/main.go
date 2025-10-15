@@ -148,6 +148,8 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 	g.P()
 	g.P("package ", file.GoPackageName)
 	g.P()
+	g.P("import \"encoding/json\"")
+	g.P()
 
 	// Generate methods and constants for each message
 	for _, message := range file.Messages {
@@ -163,7 +165,7 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 
 func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, message *protogen.Message) error {
 	var jsonStr string
-	
+
 	// Generate JSON Schema based on preserveOrder setting
 	if gen.IsPreserveOrder() {
 		orderedSchema, err := gen.GenerateOrderedSchema(message.Desc)
@@ -211,6 +213,15 @@ func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, 
 	g.P("// Performance: ~0.34 ns/op, zero memory allocation")
 	g.P("func (*", typeName, ") GetJSONSchemaBytes() []byte {")
 	g.P("\treturn []byte(", constName, ")")
+	g.P("}")
+	g.P()
+
+	// Generate GetJSONSchemaRawMessage method
+	g.P("// GetJSONSchemaRawMessage returns the JSON Schema as json.RawMessage")
+	g.P("// Useful for JSON encoding without additional escaping")
+	g.P("// Performance: ~0.34 ns/op, zero memory allocation")
+	g.P("func (*", typeName, ") GetJSONSchemaRawMessage() json.RawMessage {")
+	g.P("\treturn json.RawMessage(", constName, ")")
 	g.P("}")
 	g.P()
 

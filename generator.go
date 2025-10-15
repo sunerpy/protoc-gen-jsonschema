@@ -96,7 +96,7 @@ func (g *Generator) GenerateOrderedSchema(md protoreflect.MessageDescriptor) (*O
 
 		fieldName := g.getFieldName(field, fieldOpts)
 		fieldSchema := g.generateFieldSchema(field, fieldOpts)
-		
+
 		orderedSchema.Properties = append(orderedSchema.Properties, OrderedProperty{
 			Name:   fieldName,
 			Schema: fieldSchema,
@@ -316,9 +316,9 @@ type OrderedProperty struct {
 func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 	var buf strings.Builder
 	buf.WriteString("{")
-	
+
 	first := true
-	
+
 	// type
 	if os.Type != "" {
 		buf.WriteString(`"type":"`)
@@ -326,7 +326,7 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		buf.WriteString(`"`)
 		first = false
 	}
-	
+
 	// title
 	if os.Title != "" {
 		if !first {
@@ -337,7 +337,7 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		buf.WriteString(`"`)
 		first = false
 	}
-	
+
 	// description
 	if os.Description != "" {
 		if !first {
@@ -348,7 +348,7 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		buf.WriteString(`"`)
 		first = false
 	}
-	
+
 	// properties
 	if len(os.Properties) > 0 {
 		if !first {
@@ -371,7 +371,7 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		buf.WriteString("}")
 		first = false
 	}
-	
+
 	// required
 	if len(os.Required) > 0 {
 		if !first {
@@ -384,7 +384,7 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		buf.WriteString(`"required":`)
 		buf.Write(reqJSON)
 	}
-	
+
 	buf.WriteString("}")
 	return []byte(buf.String()), nil
 }
