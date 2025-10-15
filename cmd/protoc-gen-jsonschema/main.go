@@ -72,6 +72,7 @@ type genParams struct {
 	format        string // "json" or "go_const"
 	suffix        string // file suffix for go_const format
 	preserveOrder bool   // preserve field order from proto definition
+	schemaStruct  bool   // generate jsonschema.Schema struct literal (compile-time, zero parsing)
 }
 
 func parseParameters(param string) genParams {
@@ -100,6 +101,8 @@ func parseParameters(param string) genParams {
 			params.suffix = value
 		case "preserve_order":
 			params.preserveOrder = value == "true"
+		case "schema_struct":
+			params.schemaStruct = value == "true"
 		}
 	}
 
@@ -148,13 +151,21 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 	g.P()
 	g.P("package ", file.GoPackageName)
 	g.P()
-	g.P("import \"encoding/json\"")
+	if params.schemaStruct {
+		g.P("import (")
+		g.P("\t\"encoding/json\"")
+		g.P()
+		g.P("\tjsonschema \"github.com/sunerpy/protoc-gen-jsonschema\"")
+		g.P(")")
+	} else {
+		g.P("import \"encoding/json\"")
+	}
 	g.P()
 
 	// Generate methods and constants for each message
 	for _, message := range file.Messages {
 		if shouldGenerateSchema(message) {
-			if err := generateMessageConst(g, gen, message); err != nil {
+			if err := generateMessageConst(g, gen, message, params.schemaStruct); err != nil {
 				return fmt.Errorf("failed to generate const for %s: %w", message.Desc.FullName(), err)
 			}
 		}
@@ -163,7 +174,7 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 	return nil
 }
 
-func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, message *protogen.Message) error {
+func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, message *protogen.Message, schemaStruct bool) error {
 	var jsonStr string
 
 	// Generate JSON Schema based on preserveOrder setting
@@ -229,7 +240,102 @@ func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, 
 	g.P("const ", constName, " = `", jsonStr, "`")
 	g.P()
 
+	// Generate jsonschema.Schema struct literal if requested
+	if schemaStruct {
+		varName := toLowerCamelCase(message.GoIdent.GoName) + "Schema"
+
+		// Parse the JSON to get the schema structure
+		var schemaMap map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonStr), &schemaMap); err != nil {
+			return fmt.Errorf("failed to unmarshal schema for code generation: %w", err)
+		}
+
+		g.P("// ", varName, " is the compile-time JSON Schema for ", typeName)
+		g.P("// This is a Go struct literal, requiring zero runtime parsing")
+		g.P("// Performance: Direct struct access, zero initialization overhead, zero parsing cost")
+		g.P("var ", varName, " = ", generateSchemaLiteral(schemaMap, 0))
+		g.P()
+
+		// Generate GetSchema method
+		g.P("// GetSchema returns the compile-time JSON Schema struct for ", typeName)
+		g.P("// Unlike GetJSONSchema() which returns a string that needs json.Unmarshal,")
+		g.P("// this method returns a pre-built struct with zero parsing overhead")
+		g.P("// Performance: Direct variable access, zero allocation, zero parsing")
+		g.P("func (*", typeName, ") GetSchema() jsonschema.Schema {")
+		g.P("\treturn ", varName)
+		g.P("}")
+		g.P()
+	}
+
 	return nil
+}
+
+// generateSchemaLiteral converts a map[string]interface{} to Go code literal
+func generateSchemaLiteral(m map[string]interface{}, indent int) string {
+	if len(m) == 0 {
+		return "jsonschema.Schema{}"
+	}
+
+	var sb strings.Builder
+	sb.WriteString("jsonschema.Schema{\n")
+
+	// Sort keys for consistent output
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+
+	indentStr := strings.Repeat("\t", indent+1)
+	for i, key := range keys {
+		if i > 0 {
+			sb.WriteString(",\n")
+		}
+		sb.WriteString(indentStr)
+		sb.WriteString(fmt.Sprintf("%q: ", key))
+		sb.WriteString(generateValueLiteral(m[key], indent+1))
+	}
+
+	sb.WriteString(",\n")
+	sb.WriteString(strings.Repeat("\t", indent))
+	sb.WriteString("}")
+
+	return sb.String()
+}
+
+// generateValueLiteral converts an interface{} value to Go code literal
+func generateValueLiteral(v interface{}, indent int) string {
+	switch val := v.(type) {
+	case string:
+		return fmt.Sprintf("%q", val)
+	case int, int32, int64:
+		return fmt.Sprintf("%d", val)
+	case float32, float64:
+		return fmt.Sprintf("%v", val)
+	case bool:
+		return fmt.Sprintf("%t", val)
+	case []interface{}:
+		if len(val) == 0 {
+			return "[]interface{}{}"
+		}
+		var sb strings.Builder
+		sb.WriteString("[]interface{}{\n")
+		indentStr := strings.Repeat("\t", indent+1)
+		for i, item := range val {
+			if i > 0 {
+				sb.WriteString(",\n")
+			}
+			sb.WriteString(indentStr)
+			sb.WriteString(generateValueLiteral(item, indent+1))
+		}
+		sb.WriteString(",\n")
+		sb.WriteString(strings.Repeat("\t", indent))
+		sb.WriteString("}")
+		return sb.String()
+	case map[string]interface{}:
+		return generateSchemaLiteral(val, indent)
+	default:
+		return fmt.Sprintf("%#v", val)
+	}
 }
 
 func toLowerCamelCase(s string) string {
