@@ -41,3 +41,16 @@ message UserRequest {
     (mcp.jsonschema.example) = "+1234567890"
   ];
 }
+
+message ProductRequest { 
+  option (mcp.jsonschema.title) = "Product Request";
+  option (mcp.jsonschema.message_description) = "Request to create or update a product";
+  string name = 1 [
+    (mcp.jsonschema.required) = true,
+    (mcp.jsonschema.description) = "Product name"
+  ];
+  double price = 2 [
+    (mcp.jsonschema.minimum) = 0.01,
+    (mcp.jsonschema.description) = "Product price"
+  ];
+}

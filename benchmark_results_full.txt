@@ -1,0 +1,11 @@
+goos: linux
+goarch: amd64
+pkg: github.com/sunerpy/protoc-gen-jsonschema
+cpu: Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz
+BenchmarkDynamicGeneration-32             	  143344	      8235 ns/op	    2720 B/op	      57 allocs/op
+BenchmarkDynamicGenerationWithJSON-32     	   63229	     18603 ns/op	    7257 B/op	     118 allocs/op
+BenchmarkStaticSchemaAccess-32            	1000000000	         0.2876 ns/op	       0 B/op	       0 allocs/op
+BenchmarkStaticSchemaAccessWithJSON-32    	  204987	      5700 ns/op	    2467 B/op	      59 allocs/op
+BenchmarkStaticSchemaFromFile-32          	   88485	     13488 ns/op	    4824 B/op	     100 allocs/op
+BenchmarkGoStructConstant-32              	1000000000	         0.2880 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGoStructConstantWithJSON-32      	

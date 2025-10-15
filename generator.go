@@ -3,7 +3,6 @@ package jsonschema
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -30,14 +29,14 @@ func NewGenerator() *Generator {
 // GenerateSchema generates JSON Schema for a message descriptor
 func (g *Generator) GenerateSchema(md protoreflect.MessageDescriptor) (Schema, error) {
 	msgOpts := md.Options().(*descriptorpb.MessageOptions)
-	
+
 	if !g.shouldGenerateSchema(msgOpts) {
 		return nil, nil
 	}
 
 	schema := g.createBaseSchema(md, msgOpts)
 	properties, required := g.processFields(md.Fields())
-	
+
 	schema["properties"] = properties
 	if len(required) > 0 {
 		schema["required"] = required
@@ -62,7 +61,7 @@ func (g *Generator) createBaseSchema(md protoreflect.MessageDescriptor, msgOpts 
 	}
 
 	schema["title"] = g.getSchemaTitle(md, msgOpts)
-	
+
 	if proto.HasExtension(msgOpts, jsonschemapb.E_MessageDescription) {
 		schema["description"] = proto.GetExtension(msgOpts, jsonschemapb.E_MessageDescription).(string)
 	}

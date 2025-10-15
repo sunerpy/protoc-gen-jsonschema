@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-protoc-gen-jsonschema
+/protoc-gen-jsonschema
 
 # Test binary, built with `go test -c`
 *.test
@@ -31,6 +31,7 @@ Thumbs.db
 
 # Generated files
 *.pb.go
+example/**/*.json
 !testdata/**/*.pb.go
 !examples/**/*.pb.go
 
