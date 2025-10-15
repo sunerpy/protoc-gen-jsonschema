@@ -36,9 +36,6 @@ example/**/*.json
 !testdata/**/*.pb.go
 !examples/**/*.pb.go
 
-# Benchmark tests (depends on example package)
-benchmark_test.go
-
 # Build artifacts
 dist/
 build/
