@@ -348,27 +348,125 @@ func main() {
 
 #### 1. 安装 protoc 插件
 
+有两种方式安装插件：
+
+**方式 A：从 GitHub 安装（推荐）**
+
 ```bash
+# 安装最新版本
 go install github.com/sunerpy/protoc-gen-jsonschema/cmd/protoc-gen-jsonschema@latest
+
+# 或安装指定版本
+go install github.com/sunerpy/protoc-gen-jsonschema/cmd/protoc-gen-jsonschema@v1.0.0
 ```
+
+**方式 B：从源码构建**
+
+```bash
+# 克隆仓库
+git clone https://github.com/sunerpy/protoc-gen-jsonschema.git
+cd protoc-gen-jsonschema
+
+# 构建并安装
+go install ./cmd/protoc-gen-jsonschema
+```
+
+**验证安装**
+
+```bash
+# 检查插件是否在 PATH 中
+which protoc-gen-jsonschema
+
+# 查看版本
+protoc-gen-jsonschema --version
+```
+
+**注意事项**：
+- 确保 `$GOPATH/bin` 或 `$GOBIN` 在系统 PATH 中
+- 默认安装路径：`$GOPATH/bin/protoc-gen-jsonschema` 或 `$HOME/go/bin/protoc-gen-jsonschema`
+- 如果 `which protoc-gen-jsonschema` 找不到，需要将 Go bin 目录添加到 PATH：
+  ```bash
+  export PATH=$PATH:$(go env GOPATH)/bin
+  ```
 
 #### 2. 生成 JSON Schema 文件
 
+插件支持两种输出格式：
+
+**格式 1：JSON 文件（默认）**
+
+生成独立的 `.schema.json` 文件，适合需要独立 Schema 文件的场景。
+
 ```bash
-# 使用 protoc
+# 使用 protoc（默认生成 JSON 文件）
 protoc --jsonschema_out=. user.proto
 
-# 或使用 buf
+# 或明确指定 JSON 格式
+protoc --jsonschema_out=format=json:. user.proto
+
+# 使用 buf
 buf generate
 ```
 
-在 `buf.gen.yaml` 中配置：
-
+`buf.gen.yaml` 配置：
 ```yaml
 version: v2
 plugins:
   - local: protoc-gen-jsonschema
-    out: gen/schemas
+    out: pb
+    opt:
+      - format=json              # 生成 JSON 文件（默认）
+      - paths=source_relative
+```
+
+**格式 2：Go 常量（推荐用于高性能场景）**
+
+生成包含 JSON Schema 字符串常量的 Go 代码，零开销访问。
+
+```bash
+# 使用 protoc 生成 Go 常量
+protoc --go_out=. --jsonschema_out=format=go_const:. user.proto
+
+# 自定义文件后缀
+protoc --jsonschema_out=format=go_const,suffix=_schema:. user.proto
+```
+
+`buf.gen.yaml` 配置：
+```yaml
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: pb
+    opt:
+      - paths=source_relative
+  
+  - local: protoc-gen-jsonschema
+    out: pb
+    opt:
+      - format=go_const          # 生成 Go 常量
+      - suffix=_jsonschema       # 文件后缀（默认）
+      - paths=source_relative
+```
+
+**插件参数说明**：
+
+| 参数 | 默认值 | 说明 | 示例 |
+|------|--------|------|------|
+| `format` | `json` | 输出格式：`json` 或 `go_const` | `format=go_const` |
+| `suffix` | `_jsonschema` | Go 文件后缀（仅 go_const 格式） | `suffix=_schema` |
+| `paths` | - | 路径模式：`source_relative` 或 `import` | `paths=source_relative` |
+
+**完整示例**：
+
+```bash
+# 同时生成 protobuf Go 代码和 JSON Schema 常量
+protoc \
+  --go_out=. \
+  --go_opt=paths=source_relative \
+  --jsonschema_out=. \
+  --jsonschema_opt=format=go_const \
+  --jsonschema_opt=paths=source_relative \
+  user.proto
 ```
 
 #### 3. 生成的文件

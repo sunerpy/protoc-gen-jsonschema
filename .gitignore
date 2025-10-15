@@ -31,6 +31,7 @@ Thumbs.db
 
 # Generated files
 *.pb.go
+!mcp/**/*.pb.go
 example/**/*.json
 !testdata/**/*.pb.go
 !examples/**/*.pb.go
