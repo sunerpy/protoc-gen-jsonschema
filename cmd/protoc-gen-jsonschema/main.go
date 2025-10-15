@@ -48,6 +48,9 @@ func main() {
 		panic(fmt.Sprintf("failed to create plugin: %v", err))
 	}
 
+	// Declare supported features
+	plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
+
 	// Generate schemas for all files
 	if err := generate(plugin, params); err != nil {
 		plugin.Error(err)
