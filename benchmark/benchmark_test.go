@@ -23,8 +23,8 @@ func BenchmarkDynamicGeneration(b *testing.B) {
 // BenchmarkStaticSchemaAccess 测试静态 Schema 访问性能
 func BenchmarkStaticSchemaAccess(b *testing.B) {
 	staticSchema := map[string]interface{}{
-		"type":  "object",
-		"title": "User Request",
+		"type":        "object",
+		"title":       "User Request",
 		"description": "Request to create or update a user",
 		"properties": map[string]interface{}{
 			"email": map[string]interface{}{
