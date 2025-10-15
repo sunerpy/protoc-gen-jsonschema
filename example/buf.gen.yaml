@@ -1,0 +1,37 @@
+version: v2
+
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: pb
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go
+    # Make sure to generate your grpc-go code to the same
+    # directory as protoc-gen-go
+    out: .
+    opt: paths=source_relative
+
+  # JSON Schema 生成插件
+  # 方式 1: 生成 JSON 文件（默认）
+  # - local: protoc-gen-jsonschema
+  #   out: pb
+  #   opt:
+  #     - paths=source_relative
+
+  # 方式 2: 生成 Go 常量（高性能方案）
+  # 取消注释以启用
+  - local: protoc-gen-jsonschema
+    out: pb
+    opt:
+      - paths=source_relative
+      - format=go_const        # 生成 Go 常量而非 JSON 文件
+      - suffix=_jsonschema     # 生成文件后缀（可选，默认 _jsonschema）
+      - preserve_order=true    # 保持字段顺序
+
+  # # 1. 生成 _pb2.py  和 _pb2.pyi
+  # - remote: buf.build/protocolbuffers/python
+  #   out: .      # 生成目录随意
+  # # 2. 生成 _pb2_grpc.py （如果 proto 里定义了 service）
+  # - remote: buf.build/grpc/python
+  #   out: .
+inputs:
+  - proto_file: user.proto

@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package mcp.jsonschema;
+
+option go_package = "github.com/sunerpy/protoc-gen-jsonschema/mcp/jsonschema;jsonschema";
+
+import "google/protobuf/descriptor.proto";
+
+// 字段级别的 JSON Schema 扩展选项
+extend google.protobuf.FieldOptions {
+  // 自定义描述（优先级高于注释）
+  optional string description = 50001;
+  
+  // 示例值
+  optional string example = 50002;
+  
+  // JSON Schema format (e.g., "email", "uri", "date-time")
+  optional string format = 50003;
+  
+  // 默认值（JSON 格式字符串）
+  optional string default = 50004;
+  
+  // 是否在 Schema 中隐藏此字段
+  optional bool hidden = 50005;
+  
+  // 自定义 JSON 字段名（如果与 proto 字段名不同）
+  optional string json_name = 50006;
+  
+  // 字符串最小长度
+  optional int32 min_length = 50007;
+  
+  // 字符串最大长度
+  optional int32 max_length = 50008;
+  
+  // 数值最小值
+  optional double minimum = 50009;
+  
+  // 数值最大值
+  optional double maximum = 50010;
+  
+  // 正则表达式模式
+  optional string pattern = 50011;
+  
+  // 是否必填
+  optional bool required = 50012;
+}
+
+// 消息级别的 JSON Schema 扩展选项
+extend google.protobuf.MessageOptions {
+  // 消息描述
+  optional string message_description = 50101;
+  
+  // 是否生成 Schema（默认 true）
+  optional bool generate_schema = 50102;
+  
+  // Schema 标题
+  optional string title = 50103;
+}
