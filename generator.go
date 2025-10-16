@@ -224,7 +224,37 @@ func (g *Generator) generateFieldSchema(field protoreflect.FieldDescriptor, opts
 		}
 		schema["enum"] = enumValues
 	case protoreflect.MessageKind:
-		schema["type"] = "object"
+		// Special handling for google.protobuf.Timestamp
+		if field.Message().FullName() == "google.protobuf.Timestamp" {
+			schema = Schema{
+				"oneOf": []interface{}{
+					map[string]interface{}{
+						"type":        "string",
+						"format":      "date-time",
+						"description": "RFC3339 timestamp string",
+					},
+					map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"seconds": map[string]interface{}{
+								"type":        "integer",
+								"description": "Seconds since Unix epoch",
+							},
+							"nanos": map[string]interface{}{
+								"type":        "integer",
+								"minimum":     0,
+								"maximum":     999999999,
+								"description": "Nanoseconds within the second",
+							},
+						},
+						"required":             []string{"seconds"},
+						"additionalProperties": false,
+					},
+				},
+			}
+		} else {
+			schema["type"] = "object"
+		}
 	}
 
 	// Handle repeated fields

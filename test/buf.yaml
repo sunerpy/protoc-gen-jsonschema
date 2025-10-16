@@ -1,0 +1,9 @@
+version: v2
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE
+deps:
+  - buf.build/sunerpy/protoc-gen-jsonschema

@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package test;
+
+option go_package = "test/pb;pb";
+
+import "google/protobuf/timestamp.proto";
+import "mcp/jsonschema/jsonschema.proto";
+
+message TimestampTestMessage {
+  option (mcp.jsonschema.title) = "Timestamp Test Message";
+  option (mcp.jsonschema.message_description) = "Message for testing Timestamp field JSON Schema generation";
+
+  // Created timestamp
+  google.protobuf.Timestamp created_at = 1 [
+    (mcp.jsonschema.description) = "Creation timestamp",
+    (mcp.jsonschema.example) = "2023-01-01T00:00:00Z"
+  ];
+  
+  // Updated timestamp (optional)
+  google.protobuf.Timestamp updated_at = 2 [
+    (mcp.jsonschema.description) = "Last update timestamp"
+  ];
+  
+  // Required timestamp
+  google.protobuf.Timestamp required_timestamp = 3 [
+    (mcp.jsonschema.required) = true,
+    (mcp.jsonschema.description) = "Required timestamp field"
+  ];
+  
+  // Array of timestamps
+  repeated google.protobuf.Timestamp event_timestamps = 4 [
+    (mcp.jsonschema.description) = "Array of event timestamps"
+  ];
+  
+  // Regular string field for comparison
+  string name = 5 [
+    (mcp.jsonschema.description) = "Name field for comparison"
+  ];
+}
