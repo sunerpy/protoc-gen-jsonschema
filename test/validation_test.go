@@ -4,8 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sunerpy/protoc-gen-jsonschema/test/pb"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/sunerpy/protoc-gen-jsonschema/test/pb"
 )
 
 func TestTimestampValidationWithGeneratedSchema(t *testing.T) {
@@ -30,7 +31,9 @@ func TestTimestampValidationWithGeneratedSchema(t *testing.T) {
 		t.Error("Generated schema should contain 'RFC3339' description")
 	}
 
-	// Test cases that should work with protojson
+	// protojson only accepts the RFC3339 string form for google.protobuf.Timestamp,
+	// so only string-form payloads are exercised against the proto runtime. The
+	// schema's oneOf object branch targets generic JSON consumers, not protojson.
 	validTestCases := []struct {
 		name     string
 		jsonData string
@@ -44,39 +47,12 @@ func TestTimestampValidationWithGeneratedSchema(t *testing.T) {
 			}`,
 		},
 		{
-			name: "Object format",
-			jsonData: `{
-				"requiredTimestamp": {"seconds": 1672531200, "nanos": 0},
-				"createdAt": {"seconds": 1672576245, "nanos": 123000000},
-				"name": "test"
-			}`,
-		},
-		{
-			name: "Mixed formats",
-			jsonData: `{
-				"requiredTimestamp": "2023-01-01T00:00:00Z",
-				"createdAt": {"seconds": 1672576245, "nanos": 123000000},
-				"name": "test"
-			}`,
-		},
-		{
 			name: "Array of timestamps - string format",
 			jsonData: `{
 				"requiredTimestamp": "2023-01-01T00:00:00Z",
 				"eventTimestamps": [
 					"2023-01-01T10:00:00Z",
 					"2023-01-01T11:00:00Z"
-				],
-				"name": "test"
-			}`,
-		},
-		{
-			name: "Array of timestamps - object format",
-			jsonData: `{
-				"requiredTimestamp": "2023-01-01T00:00:00Z",
-				"eventTimestamps": [
-					{"seconds": 1672567200, "nanos": 0},
-					{"seconds": 1672570800, "nanos": 500000000}
 				],
 				"name": "test"
 			}`,
@@ -98,56 +74,37 @@ func TestTimestampValidationWithGeneratedSchema(t *testing.T) {
 }
 
 func TestProtojsonCompatibility(t *testing.T) {
-	// Test that protojson can unmarshal both formats successfully
-	testCases := []struct {
-		name     string
-		jsonData string
-	}{
-		{
-			name: "RFC3339 string format",
-			jsonData: `{
-				"requiredTimestamp": "2023-01-01T00:00:00Z",
-				"createdAt": "2023-01-01T12:30:45.123Z"
-			}`,
-		},
-		{
-			name: "Object format",
-			jsonData: `{
-				"requiredTimestamp": {"seconds": 1672531200, "nanos": 0},
-				"createdAt": {"seconds": 1672576245, "nanos": 123000000}
-			}`,
-		},
-	}
+	t.Run("accepts RFC3339 string form", func(t *testing.T) {
+		jsonData := `{
+			"requiredTimestamp": "2023-01-01T00:00:00Z",
+			"createdAt": "2023-01-01T12:30:45.123Z"
+		}`
+		msg := &pb.TimestampTestMessage{}
+		if err := protojson.Unmarshal([]byte(jsonData), msg); err != nil {
+			t.Fatalf("protojson.Unmarshal failed for string form: %v", err)
+		}
+		if msg.RequiredTimestamp == nil {
+			t.Error("RequiredTimestamp should not be nil")
+		}
+		if msg.CreatedAt == nil {
+			t.Error("CreatedAt should not be nil")
+		}
+		jsonBytes, err := protojson.Marshal(msg)
+		if err != nil {
+			t.Fatalf("protojson.Marshal failed: %v", err)
+		}
+		t.Logf("Marshaled JSON: %s", string(jsonBytes))
+	})
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			msg := &pb.TimestampTestMessage{}
-			err := protojson.Unmarshal([]byte(tc.jsonData), msg)
-			if err != nil {
-				t.Errorf("protojson.Unmarshal failed: %v", err)
-				return
-			}
-
-			// Verify that timestamps were parsed correctly
-			if msg.RequiredTimestamp == nil {
-				t.Error("RequiredTimestamp should not be nil")
-			}
-
-			if msg.CreatedAt == nil {
-				t.Error("CreatedAt should not be nil")
-			}
-
-			// Test marshaling back to JSON
-			jsonBytes, err := protojson.Marshal(msg)
-			if err != nil {
-				t.Errorf("protojson.Marshal failed: %v", err)
-				return
-			}
-
-			t.Logf("✓ protojson compatibility verified for %s", tc.name)
-			t.Logf("Marshaled JSON: %s", string(jsonBytes))
-		})
-	}
+	t.Run("rejects seconds/nanos object form", func(t *testing.T) {
+		jsonData := `{
+			"requiredTimestamp": {"seconds": 1672531200, "nanos": 0}
+		}`
+		msg := &pb.TimestampTestMessage{}
+		if err := protojson.Unmarshal([]byte(jsonData), msg); err == nil {
+			t.Error("expected protojson to reject the object form of Timestamp, but it succeeded")
+		}
+	})
 }
 
 func TestSolutionSummary(t *testing.T) {

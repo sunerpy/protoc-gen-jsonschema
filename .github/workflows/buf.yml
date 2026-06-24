@@ -1,0 +1,28 @@
+name: Buf
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  delete:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  buf:
+    name: Buf lint, breaking & push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Buf
+        uses: bufbuild/buf-action@v1
+        with:
+          token: ${{ secrets.BUF_TOKEN }}

@@ -1,0 +1,69 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - github.com/sunerpy/protoc-gen-jsonschema
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - unconvert
+    - bodyclose
+
+  settings:
+    govet:
+      disable:
+        - fieldalignment
+    misspell:
+      locale: US
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      # Generated protobuf / jsonschema code
+      - path: '\.pb\.go$'
+        linters:
+          - all
+
+      # Relax checks in test files
+      - path: _test\.go
+        linters:
+          - errcheck
+          - bodyclose
+          - unused
+
+      # Standalone example module
+      - path: example/
+        linters:
+          - errcheck
+
+      # Vendored code
+      - path: vendor/
+        linters:
+          - all
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10

@@ -1,0 +1,20 @@
+# oxfmt formats non-Go files (YAML / Markdown / JSON). The following are
+# excluded because they are either generated, vendored, or have formatting
+# owned by another tool (buf, protoc), so reformatting them would create churn
+# or break downstream tooling.
+
+# Vendored dependencies
+vendor/
+
+# Generated protobuf artifacts
+*.pb.go
+mcp/jsonschema/jsonschema.pb.go
+
+# buf-managed lockfiles (do not reformat)
+buf.lock
+**/buf.lock
+
+# Build output
+dist/
+build/
+bin/

@@ -1,43 +1,39 @@
 package test
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
-	protojsonschema "github.com/sunerpy/protoc-gen-jsonschema"
-	"github.com/sunerpy/protoc-gen-jsonschema/test/pb"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/sunerpy/protoc-gen-jsonschema/test/pb"
 )
 
+// schemaAsMap generates a schema and round-trips it through JSON so every nested
+// value is a plain map[string]interface{}. This avoids brittle type assertions
+// against the named jsonschema.Schema type, and exercises the exact serialized
+// shape that downstream JSON consumers receive.
+func schemaAsMap(t *testing.T, msg interface{ GetJSONSchema() string }) map[string]interface{} {
+	t.Helper()
+	var out map[string]interface{}
+	if err := json.Unmarshal([]byte(msg.GetJSONSchema()), &out); err != nil {
+		t.Fatalf("failed to unmarshal generated schema: %v", err)
+	}
+	return out
+}
+
 func TestTimestampSchemaGeneration(t *testing.T) {
-	// Create a test message instance
 	msg := &pb.TimestampTestMessage{}
+	schema := schemaAsMap(t, msg)
 
-	// Generate schema using the protobuf generator
-	generator := protojsonschema.NewGenerator()
-	schema, err := generator.GenerateSchema(msg.ProtoReflect().Descriptor())
-	if err != nil {
-		t.Fatalf("Failed to generate schema: %v", err)
-	}
-
-	// Convert schema to JSON for inspection
-	schemaJSON, err := schema.ToJSON()
-	if err != nil {
-		t.Fatalf("Failed to convert schema to JSON: %v", err)
-	}
-
-	t.Logf("Generated schema:\n%s", schemaJSON)
-
-	// Verify that timestamp fields have oneOf structure
 	properties, ok := schema["properties"].(map[string]interface{})
 	if !ok {
 		t.Fatal("Schema properties is not a map")
 	}
 
-	// Check createdAt field (should be in the schema)
 	createdAtSchema, ok := properties["createdAt"].(map[string]interface{})
 	if !ok {
-		// Print available properties for debugging
 		t.Logf("Available properties: %v", properties)
 		t.Fatal("createdAt field not found in schema")
 	}
@@ -100,27 +96,19 @@ func TestTimestampSchemaGeneration(t *testing.T) {
 		t.Errorf("Expected integer type for nanos, got %v", nanosProperty["type"])
 	}
 
-	if nanosProperty["minimum"] != 0 {
+	if nanosProperty["minimum"] != float64(0) {
 		t.Errorf("Expected minimum 0 for nanos, got %v", nanosProperty["minimum"])
 	}
 
-	if nanosProperty["maximum"] != 999999999 {
+	if nanosProperty["maximum"] != float64(999999999) {
 		t.Errorf("Expected maximum 999999999 for nanos, got %v", nanosProperty["maximum"])
 	}
 }
 
 func TestTimestampArraySchemaGeneration(t *testing.T) {
-	// Create a test message instance
 	msg := &pb.TimestampTestMessage{}
+	schema := schemaAsMap(t, msg)
 
-	// Generate schema
-	generator := protojsonschema.NewGenerator()
-	schema, err := generator.GenerateSchema(msg.ProtoReflect().Descriptor())
-	if err != nil {
-		t.Fatalf("Failed to generate schema: %v", err)
-	}
-
-	// Check array field
 	properties, ok := schema["properties"].(map[string]interface{})
 	if !ok {
 		t.Fatal("Schema properties is not a map")
@@ -192,7 +180,9 @@ func TestTimestampJSONSchemaContent(t *testing.T) {
 }
 
 func TestProtojsonCompatibilityWithGeneratedSchema(t *testing.T) {
-	// Test that protojson can unmarshal RFC3339 strings successfully
+	// protojson only accepts RFC3339 string form for google.protobuf.Timestamp.
+	// The schema's oneOf object branch targets generic JSON consumers, not the
+	// proto runtime, so only the string form is exercised against protojson here.
 	testCases := []struct {
 		name     string
 		jsonData string
@@ -202,13 +192,6 @@ func TestProtojsonCompatibilityWithGeneratedSchema(t *testing.T) {
 			jsonData: `{
 				"requiredTimestamp": "2023-01-01T00:00:00Z",
 				"createdAt": "2023-01-01T12:30:45.123Z"
-			}`,
-		},
-		{
-			name: "Object format",
-			jsonData: `{
-				"requiredTimestamp": {"seconds": 1672531200, "nanos": 0},
-				"createdAt": {"seconds": 1672576245, "nanos": 123000000}
 			}`,
 		},
 	}
@@ -221,7 +204,6 @@ func TestProtojsonCompatibilityWithGeneratedSchema(t *testing.T) {
 				t.Errorf("protojson.Unmarshal failed: %v", err)
 			}
 
-			// Verify that timestamps were parsed correctly
 			if msg.RequiredTimestamp == nil {
 				t.Error("RequiredTimestamp should not be nil")
 			}
@@ -230,7 +212,6 @@ func TestProtojsonCompatibilityWithGeneratedSchema(t *testing.T) {
 				t.Error("CreatedAt should not be nil")
 			}
 
-			// Test marshaling back to JSON
 			jsonBytes, err := protojson.Marshal(msg)
 			if err != nil {
 				t.Errorf("protojson.Marshal failed: %v", err)

@@ -12,11 +12,11 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/pluginpb"
 
-	"github.com/sunerpy/protoc-gen-jsonschema"
+	jsonschema "github.com/sunerpy/protoc-gen-jsonschema"
 	jsonschemapb "github.com/sunerpy/protoc-gen-jsonschema/mcp/jsonschema"
 )
 
-const version = "1.0.0"
+var version = "dev"
 
 func main() {
 	showVersion := flag.Bool("version", false, "print the version and exit")
@@ -182,7 +182,7 @@ func generateGoConstFile(plugin *protogen.Plugin, gen *jsonschema.Generator, fil
 	return nil
 }
 
-func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, message *protogen.Message, schemaStruct bool, googleSchema bool) error {
+func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, message *protogen.Message, schemaStruct, googleSchema bool) error {
 	var jsonStr string
 
 	// Generate JSON Schema based on preserveOrder setting
@@ -328,7 +328,7 @@ func generateSchemaLiteral(m map[string]interface{}, indent int) string {
 			sb.WriteString(",\n")
 		}
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("%q: ", key))
+		fmt.Fprintf(&sb, "%q: ", key)
 		sb.WriteString(generateValueLiteral(m[key], indent+1))
 	}
 
@@ -384,57 +384,57 @@ func generateGoogleSchemaLiteral(m map[string]interface{}, indent int) string {
 	// Type
 	if typeVal, ok := m["type"].(string); ok {
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("Type: %q,\n", typeVal))
+		fmt.Fprintf(&sb, "Type: %q,\n", typeVal)
 	}
 
 	// Title
 	if title, ok := m["title"].(string); ok {
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("Title: %q,\n", title))
+		fmt.Fprintf(&sb, "Title: %q,\n", title)
 	}
 
 	// Description
 	if desc, ok := m["description"].(string); ok {
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("Description: %q,\n", desc))
+		fmt.Fprintf(&sb, "Description: %q,\n", desc)
 	}
 
 	// Format
 	if format, ok := m["format"].(string); ok {
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("Format: %q,\n", format))
+		fmt.Fprintf(&sb, "Format: %q,\n", format)
 	}
 
 	// Pattern
 	if pattern, ok := m["pattern"].(string); ok {
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("Pattern: %q,\n", pattern))
+		fmt.Fprintf(&sb, "Pattern: %q,\n", pattern)
 	}
 
 	// MinLength
 	if minLen, ok := m["minLength"].(float64); ok {
 		val := int(minLen)
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("MinLength: &[]int{%d}[0],\n", val))
+		fmt.Fprintf(&sb, "MinLength: &[]int{%d}[0],\n", val)
 	}
 
 	// MaxLength
 	if maxLen, ok := m["maxLength"].(float64); ok {
 		val := int(maxLen)
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("MaxLength: &[]int{%d}[0],\n", val))
+		fmt.Fprintf(&sb, "MaxLength: &[]int{%d}[0],\n", val)
 	}
 
 	// Minimum
 	if min, ok := m["minimum"].(float64); ok {
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("Minimum: &[]float64{%v}[0],\n", min))
+		fmt.Fprintf(&sb, "Minimum: &[]float64{%v}[0],\n", min)
 	}
 
 	// Maximum
 	if max, ok := m["maximum"].(float64); ok {
 		sb.WriteString(indentStr)
-		sb.WriteString(fmt.Sprintf("Maximum: &[]float64{%v}[0],\n", max))
+		fmt.Fprintf(&sb, "Maximum: &[]float64{%v}[0],\n", max)
 	}
 
 	// Enum
@@ -445,7 +445,7 @@ func generateGoogleSchemaLiteral(m map[string]interface{}, indent int) string {
 			if i > 0 {
 				sb.WriteString(", ")
 			}
-			sb.WriteString(fmt.Sprintf("%q", e))
+			fmt.Fprintf(&sb, "%q", e)
 		}
 		sb.WriteString("},\n")
 	}
@@ -457,7 +457,7 @@ func generateGoogleSchemaLiteral(m map[string]interface{}, indent int) string {
 		for key, val := range props {
 			if propMap, ok := val.(map[string]interface{}); ok {
 				sb.WriteString(strings.Repeat("\t", indent+2))
-				sb.WriteString(fmt.Sprintf("%q: ", key))
+				fmt.Fprintf(&sb, "%q: ", key)
 				sb.WriteString(generateGoogleSchemaLiteral(propMap, indent+2))
 				sb.WriteString(",\n")
 			}
@@ -474,7 +474,7 @@ func generateGoogleSchemaLiteral(m map[string]interface{}, indent int) string {
 			if i > 0 {
 				sb.WriteString(", ")
 			}
-			sb.WriteString(fmt.Sprintf("%q", r))
+			fmt.Fprintf(&sb, "%q", r)
 		}
 		sb.WriteString("},\n")
 	}
