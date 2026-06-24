@@ -111,12 +111,22 @@ func (g *Generator) forEachVisibleField(fields protoreflect.FieldDescriptors, fn
 	}
 }
 
-// shouldGenerateSchema checks if schema generation is enabled
-func (g *Generator) shouldGenerateSchema(msgOpts *descriptorpb.MessageOptions) bool {
+// ShouldGenerateSchema reports whether schema generation is enabled for a
+// message with the given options. A nil options value (message declares no
+// options) enables generation, as does an absent generate_schema extension.
+func ShouldGenerateSchema(msgOpts *descriptorpb.MessageOptions) bool {
+	if msgOpts == nil {
+		return true
+	}
 	if proto.HasExtension(msgOpts, jsonschemapb.E_GenerateSchema) {
 		return proto.GetExtension(msgOpts, jsonschemapb.E_GenerateSchema).(bool)
 	}
 	return true
+}
+
+// shouldGenerateSchema checks if schema generation is enabled
+func (g *Generator) shouldGenerateSchema(msgOpts *descriptorpb.MessageOptions) bool {
+	return ShouldGenerateSchema(msgOpts)
 }
 
 // createBaseSchema creates the base schema with title and description

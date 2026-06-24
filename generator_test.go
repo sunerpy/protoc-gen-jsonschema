@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	jsonschemapb "github.com/sunerpy/protoc-gen-jsonschema/mcp/jsonschema"
 )
 
 func mustSchemaMap(t *testing.T, s Schema) map[string]interface{} {
@@ -271,5 +275,25 @@ func TestGenerateOrderedSchema_Timestamp(t *testing.T) {
 	}
 	if len(ordered.Properties) == 0 {
 		t.Error("expected at least one ordered property")
+	}
+}
+
+func TestShouldGenerateSchema_NilOptions(t *testing.T) {
+	if !ShouldGenerateSchema(nil) {
+		t.Error("nil options must enable generation")
+	}
+}
+
+func TestShouldGenerateSchema_AbsentExtension(t *testing.T) {
+	if !ShouldGenerateSchema(&descriptorpb.MessageOptions{}) {
+		t.Error("absent generate_schema extension must enable generation")
+	}
+}
+
+func TestShouldGenerateSchema_ExplicitFalse(t *testing.T) {
+	opts := &descriptorpb.MessageOptions{}
+	proto.SetExtension(opts, jsonschemapb.E_GenerateSchema, false)
+	if ShouldGenerateSchema(opts) {
+		t.Error("generate_schema=false must disable generation")
 	}
 }

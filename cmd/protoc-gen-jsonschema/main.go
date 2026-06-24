@@ -10,10 +10,10 @@ import (
 
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 
 	jsonschema "github.com/sunerpy/protoc-gen-jsonschema"
-	jsonschemapb "github.com/sunerpy/protoc-gen-jsonschema/mcp/jsonschema"
 )
 
 var version = "dev"
@@ -551,14 +551,6 @@ func generateSchemaFile(plugin *protogen.Plugin, gen *jsonschema.Generator, file
 }
 
 func shouldGenerateSchema(message *protogen.Message) bool {
-	opts := message.Desc.Options()
-	if opts == nil {
-		return true
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_GenerateSchema) {
-		return proto.GetExtension(opts, jsonschemapb.E_GenerateSchema).(bool)
-	}
-
-	return true
+	opts, _ := message.Desc.Options().(*descriptorpb.MessageOptions)
+	return jsonschema.ShouldGenerateSchema(opts)
 }
