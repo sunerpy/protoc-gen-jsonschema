@@ -40,27 +40,30 @@ var userRequestGoogleSchema = &jsonschema.Schema{
 	Title:       "User Request",
 	Description: "Request to create or update a user",
 	Properties: map[string]*jsonschema.Schema{
-		"email": &jsonschema.Schema{
-			Type:        "string",
-			Description: "User's email address",
-			Format:      "email",
-		},
-		"name": &jsonschema.Schema{
-			Type:        "string",
-			Description: "User's full name",
-			MinLength:   &[]int{3}[0],
-			MaxLength:   &[]int{50}[0],
-		},
 		"age": &jsonschema.Schema{
 			Type:        "integer",
 			Description: "User's age in years",
 			Minimum:     &[]float64{18}[0],
 			Maximum:     &[]float64{120}[0],
 		},
+		"email": &jsonschema.Schema{
+			Type:        "string",
+			Description: "User's email address",
+			Format:      "email",
+			Examples:    []any{"user@example.com"},
+		},
+		"name": &jsonschema.Schema{
+			Type:        "string",
+			Description: "User's full name",
+			MinLength:   &[]int{3}[0],
+			MaxLength:   &[]int{50}[0],
+			Examples:    []any{"John Doe"},
+		},
 		"phone": &jsonschema.Schema{
 			Type:        "string",
 			Description: "User's phone number in E.164 format",
 			Pattern:     "^\\+?[1-9]\\d{1,14}$",
+			Examples:    []any{"+1234567890"},
 		},
 	},
 	Required: []string{"email", "name"},

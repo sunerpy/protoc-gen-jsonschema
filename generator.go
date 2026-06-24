@@ -17,21 +17,17 @@ type Schema map[string]interface{}
 
 // Generator generates JSON Schema from protobuf messages
 type Generator struct {
-	schemas       map[string]Schema
 	preserveOrder bool
 }
 
 // NewGenerator creates a new Generator
 func NewGenerator() *Generator {
-	return &Generator{
-		schemas: make(map[string]Schema),
-	}
+	return &Generator{}
 }
 
 // NewGeneratorWithOptions creates a new Generator with options
 func NewGeneratorWithOptions(preserveOrder bool) *Generator {
 	return &Generator{
-		schemas:       make(map[string]Schema),
 		preserveOrder: preserveOrder,
 	}
 }
@@ -85,7 +81,24 @@ func (g *Generator) GenerateOrderedSchema(md protoreflect.MessageDescriptor) (*O
 	}
 
 	// Process fields in order
-	fields := md.Fields()
+	g.forEachVisibleField(md.Fields(), func(name string, fieldSchema Schema, required bool) {
+		orderedSchema.Properties = append(orderedSchema.Properties, OrderedProperty{
+			Name:   name,
+			Schema: fieldSchema,
+		})
+		if required {
+			orderedSchema.Required = append(orderedSchema.Required, name)
+		}
+	})
+
+	return orderedSchema, nil
+}
+
+// forEachVisibleField walks fields in descriptor order, skips hidden ones, and
+// invokes fn with each field's resolved JSON name, generated schema, and
+// required flag. Shared by the map and ordered schema paths so name resolution,
+// hidden-skip, and required detection cannot drift between them.
+func (g *Generator) forEachVisibleField(fields protoreflect.FieldDescriptors, fn func(name string, schema Schema, required bool)) {
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
 		fieldOpts := field.Options().(*descriptorpb.FieldOptions)
@@ -94,28 +107,26 @@ func (g *Generator) GenerateOrderedSchema(md protoreflect.MessageDescriptor) (*O
 			continue
 		}
 
-		fieldName := g.getFieldName(field, fieldOpts)
-		fieldSchema := g.generateFieldSchema(field, fieldOpts)
-
-		orderedSchema.Properties = append(orderedSchema.Properties, OrderedProperty{
-			Name:   fieldName,
-			Schema: fieldSchema,
-		})
-
-		if g.isFieldRequired(fieldOpts) {
-			orderedSchema.Required = append(orderedSchema.Required, fieldName)
-		}
+		fn(g.getFieldName(field, fieldOpts), g.generateFieldSchema(field, fieldOpts), g.isFieldRequired(fieldOpts))
 	}
-
-	return orderedSchema, nil
 }
 
-// shouldGenerateSchema checks if schema generation is enabled
-func (g *Generator) shouldGenerateSchema(msgOpts *descriptorpb.MessageOptions) bool {
+// ShouldGenerateSchema reports whether schema generation is enabled for a
+// message with the given options. A nil options value (message declares no
+// options) enables generation, as does an absent generate_schema extension.
+func ShouldGenerateSchema(msgOpts *descriptorpb.MessageOptions) bool {
+	if msgOpts == nil {
+		return true
+	}
 	if proto.HasExtension(msgOpts, jsonschemapb.E_GenerateSchema) {
 		return proto.GetExtension(msgOpts, jsonschemapb.E_GenerateSchema).(bool)
 	}
 	return true
+}
+
+// shouldGenerateSchema checks if schema generation is enabled
+func (g *Generator) shouldGenerateSchema(msgOpts *descriptorpb.MessageOptions) bool {
+	return ShouldGenerateSchema(msgOpts)
 }
 
 // createBaseSchema creates the base schema with title and description
@@ -147,22 +158,12 @@ func (g *Generator) processFields(fields protoreflect.FieldDescriptors) (map[str
 	properties := make(map[string]interface{})
 	required := []string{}
 
-	for i := 0; i < fields.Len(); i++ {
-		field := fields.Get(i)
-		fieldOpts := field.Options().(*descriptorpb.FieldOptions)
-
-		if g.isFieldHidden(fieldOpts) {
-			continue
+	g.forEachVisibleField(fields, func(name string, fieldSchema Schema, isRequired bool) {
+		properties[name] = fieldSchema
+		if isRequired {
+			required = append(required, name)
 		}
-
-		fieldName := g.getFieldName(field, fieldOpts)
-		fieldSchema := g.generateFieldSchema(field, fieldOpts)
-		properties[fieldName] = fieldSchema
-
-		if g.isFieldRequired(fieldOpts) {
-			required = append(required, fieldName)
-		}
-	}
+	})
 
 	return properties, required
 }
@@ -266,18 +267,16 @@ func (g *Generator) generateFieldSchema(field protoreflect.FieldDescriptor, opts
 	}
 
 	// Apply custom options
-	if proto.HasExtension(opts, jsonschemapb.E_Description) {
-		schema["description"] = proto.GetExtension(opts, jsonschemapb.E_Description).(string)
-	}
+	applyExt[string](schema, opts, "description", jsonschemapb.E_Description)
+	applyExt[string](schema, opts, "example", jsonschemapb.E_Example)
+	applyExt[string](schema, opts, "format", jsonschemapb.E_Format)
+	applyExt[int32](schema, opts, "minLength", jsonschemapb.E_MinLength)
+	applyExt[int32](schema, opts, "maxLength", jsonschemapb.E_MaxLength)
+	applyExt[float64](schema, opts, "minimum", jsonschemapb.E_Minimum)
+	applyExt[float64](schema, opts, "maximum", jsonschemapb.E_Maximum)
+	applyExt[string](schema, opts, "pattern", jsonschemapb.E_Pattern)
 
-	if proto.HasExtension(opts, jsonschemapb.E_Example) {
-		schema["example"] = proto.GetExtension(opts, jsonschemapb.E_Example).(string)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_Format) {
-		schema["format"] = proto.GetExtension(opts, jsonschemapb.E_Format).(string)
-	}
-
+	// default is special: its string payload is parsed as JSON and skipped on error.
 	if proto.HasExtension(opts, jsonschemapb.E_Default) {
 		defaultStr := proto.GetExtension(opts, jsonschemapb.E_Default).(string)
 		var defaultValue interface{}
@@ -286,34 +285,23 @@ func (g *Generator) generateFieldSchema(field protoreflect.FieldDescriptor, opts
 		}
 	}
 
-	if proto.HasExtension(opts, jsonschemapb.E_MinLength) {
-		schema["minLength"] = proto.GetExtension(opts, jsonschemapb.E_MinLength).(int32)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_MaxLength) {
-		schema["maxLength"] = proto.GetExtension(opts, jsonschemapb.E_MaxLength).(int32)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_Minimum) {
-		schema["minimum"] = proto.GetExtension(opts, jsonschemapb.E_Minimum).(float64)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_Maximum) {
-		schema["maximum"] = proto.GetExtension(opts, jsonschemapb.E_Maximum).(float64)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_Pattern) {
-		schema["pattern"] = proto.GetExtension(opts, jsonschemapb.E_Pattern).(string)
-	}
-
 	return schema
+}
+
+// applyExt copies a present field-option extension of type T into schema[key],
+// preserving the extension's exact Go type (string/int32/float64) so downstream
+// type assertions and generated literals stay byte-stable.
+func applyExt[T any](schema Schema, opts *descriptorpb.FieldOptions, key string, ext protoreflect.ExtensionType) {
+	if proto.HasExtension(opts, ext) {
+		schema[key] = proto.GetExtension(opts, ext).(T)
+	}
 }
 
 // ToJSON converts schema to JSON string
 func (s Schema) ToJSON() (string, error) {
-	data, err := json.MarshalIndent(s, "", "  ")
+	data, err := s.ToJSONBytes()
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal schema: %w", err)
+		return "", err
 	}
 	return string(data), nil
 }
@@ -351,9 +339,10 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 
 	// type
 	if os.Type != "" {
-		buf.WriteString(`"type":"`)
-		buf.WriteString(os.Type)
-		buf.WriteString(`"`)
+		buf.WriteString(`"type":`)
+		if err := writeJSONString(&buf, os.Type); err != nil {
+			return nil, err
+		}
 		first = false
 	}
 
@@ -362,9 +351,10 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		if !first {
 			buf.WriteString(",")
 		}
-		buf.WriteString(`"title":"`)
-		buf.WriteString(os.Title)
-		buf.WriteString(`"`)
+		buf.WriteString(`"title":`)
+		if err := writeJSONString(&buf, os.Title); err != nil {
+			return nil, err
+		}
 		first = false
 	}
 
@@ -373,9 +363,10 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		if !first {
 			buf.WriteString(",")
 		}
-		buf.WriteString(`"description":"`)
-		buf.WriteString(os.Description)
-		buf.WriteString(`"`)
+		buf.WriteString(`"description":`)
+		if err := writeJSONString(&buf, os.Description); err != nil {
+			return nil, err
+		}
 		first = false
 	}
 
@@ -389,9 +380,10 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 			if i > 0 {
 				buf.WriteString(",")
 			}
-			buf.WriteString(`"`)
-			buf.WriteString(prop.Name)
-			buf.WriteString(`":`)
+			if err := writeJSONString(&buf, prop.Name); err != nil {
+				return nil, err
+			}
+			buf.WriteString(`:`)
 			propJSON, err := json.Marshal(prop.Schema)
 			if err != nil {
 				return nil, err
@@ -417,6 +409,20 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 
 	buf.WriteString("}")
 	return []byte(buf.String()), nil
+}
+
+// writeJSONString encodes s as a JSON string into buf, escaping it correctly
+// while keeping <, >, and & literal (SetEscapeHTML(false)) so output stays
+// byte-identical for values without quotes/backslashes/control characters.
+func writeJSONString(buf *strings.Builder, s string) error {
+	var enc strings.Builder
+	e := json.NewEncoder(&enc)
+	e.SetEscapeHTML(false)
+	if err := e.Encode(s); err != nil {
+		return err
+	}
+	buf.WriteString(strings.TrimRight(enc.String(), "\n"))
+	return nil
 }
 
 // GenerateFromMessage generates JSON Schema from a protobuf message

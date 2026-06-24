@@ -42,21 +42,119 @@ var timestampTestMessageGoogleSchema = &jsonschema.Schema{
 	Properties: map[string]*jsonschema.Schema{
 		"createdAt": &jsonschema.Schema{
 			Description: "Creation timestamp",
-		},
-		"updatedAt": &jsonschema.Schema{
-			Description: "Last update timestamp",
-		},
-		"requiredTimestamp": &jsonschema.Schema{
-			Description: "Required timestamp field",
+			Examples:    []any{"2023-01-01T00:00:00Z"},
+			OneOf: []*jsonschema.Schema{
+				&jsonschema.Schema{
+					Type:        "string",
+					Description: "RFC3339 timestamp string",
+					Format:      "date-time",
+				},
+				&jsonschema.Schema{
+					Type:                 "object",
+					AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+					Properties: map[string]*jsonschema.Schema{
+						"nanos": &jsonschema.Schema{
+							Type:        "integer",
+							Description: "Nanoseconds within the second",
+							Minimum:     &[]float64{0}[0],
+							Maximum:     &[]float64{9.99999999e+08}[0],
+						},
+						"seconds": &jsonschema.Schema{
+							Type:        "integer",
+							Description: "Seconds since Unix epoch",
+						},
+					},
+					Required: []string{"seconds"},
+				},
+			},
 		},
 		"eventTimestamps": &jsonschema.Schema{
 			Type:        "array",
 			Description: "Array of event timestamps",
-			Items:       &jsonschema.Schema{},
+			Items: &jsonschema.Schema{
+				OneOf: []*jsonschema.Schema{
+					&jsonschema.Schema{
+						Type:        "string",
+						Description: "RFC3339 timestamp string",
+						Format:      "date-time",
+					},
+					&jsonschema.Schema{
+						Type:                 "object",
+						AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+						Properties: map[string]*jsonschema.Schema{
+							"nanos": &jsonschema.Schema{
+								Type:        "integer",
+								Description: "Nanoseconds within the second",
+								Minimum:     &[]float64{0}[0],
+								Maximum:     &[]float64{9.99999999e+08}[0],
+							},
+							"seconds": &jsonschema.Schema{
+								Type:        "integer",
+								Description: "Seconds since Unix epoch",
+							},
+						},
+						Required: []string{"seconds"},
+					},
+				},
+			},
 		},
 		"name": &jsonschema.Schema{
 			Type:        "string",
 			Description: "Name field for comparison",
+		},
+		"requiredTimestamp": &jsonschema.Schema{
+			Description: "Required timestamp field",
+			OneOf: []*jsonschema.Schema{
+				&jsonschema.Schema{
+					Type:        "string",
+					Description: "RFC3339 timestamp string",
+					Format:      "date-time",
+				},
+				&jsonschema.Schema{
+					Type:                 "object",
+					AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+					Properties: map[string]*jsonschema.Schema{
+						"nanos": &jsonschema.Schema{
+							Type:        "integer",
+							Description: "Nanoseconds within the second",
+							Minimum:     &[]float64{0}[0],
+							Maximum:     &[]float64{9.99999999e+08}[0],
+						},
+						"seconds": &jsonschema.Schema{
+							Type:        "integer",
+							Description: "Seconds since Unix epoch",
+						},
+					},
+					Required: []string{"seconds"},
+				},
+			},
+		},
+		"updatedAt": &jsonschema.Schema{
+			Description: "Last update timestamp",
+			OneOf: []*jsonschema.Schema{
+				&jsonschema.Schema{
+					Type:        "string",
+					Description: "RFC3339 timestamp string",
+					Format:      "date-time",
+				},
+				&jsonschema.Schema{
+					Type:                 "object",
+					AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+					Properties: map[string]*jsonschema.Schema{
+						"nanos": &jsonschema.Schema{
+							Type:        "integer",
+							Description: "Nanoseconds within the second",
+							Minimum:     &[]float64{0}[0],
+							Maximum:     &[]float64{9.99999999e+08}[0],
+						},
+						"seconds": &jsonschema.Schema{
+							Type:        "integer",
+							Description: "Seconds since Unix epoch",
+						},
+					},
+					Required: []string{"seconds"},
+				},
+			},
 		},
 	},
 	Required: []string{"requiredTimestamp"},

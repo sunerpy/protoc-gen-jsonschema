@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	jsonschemapb "github.com/sunerpy/protoc-gen-jsonschema/mcp/jsonschema"
 )
 
 func mustSchemaMap(t *testing.T, s Schema) map[string]interface{} {
@@ -197,6 +201,66 @@ func TestOrderedSchema_MarshalJSON_Empty(t *testing.T) {
 	}
 }
 
+// TestOrderedSchema_MarshalJSON_Escaping pins the escaping contract: any
+// Title/Description must yield valid JSON that round-trips, including values
+// with quotes, backslashes, control chars, and <>&.
+func TestOrderedSchema_MarshalJSON_Escaping(t *testing.T) {
+	cases := []struct {
+		name        string
+		title       string
+		description string
+	}{
+		{"double-quote", `He said "hi"`, `desc with "quotes"`},
+		{"backslash", `back\slash`, `c:\path\to`},
+		{"newline", "line1\nline2", "tab\there"},
+		{"html-chars", "a<b>&c", "x < y && z > w"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			os := &OrderedSchema{
+				Type:        "object",
+				Title:       tc.title,
+				Description: tc.description,
+				Properties: []OrderedProperty{
+					{Name: "f", Schema: map[string]interface{}{"type": "string"}},
+				},
+			}
+			data, err := json.Marshal(os)
+			if err != nil {
+				t.Fatalf("MarshalJSON failed: %v", err)
+			}
+			var parsed map[string]interface{}
+			if err := json.Unmarshal(data, &parsed); err != nil {
+				t.Fatalf("produced INVALID JSON for %q: %v\noutput: %s", tc.name, err, data)
+			}
+			if parsed["title"] != tc.title {
+				t.Errorf("title round-trip mismatch: got %q want %q", parsed["title"], tc.title)
+			}
+			if parsed["description"] != tc.description {
+				t.Errorf("description round-trip mismatch: got %q want %q", parsed["description"], tc.description)
+			}
+		})
+	}
+}
+
+// TestOrderedSchema_MarshalJSON_HTMLByteParity pins that HTML chars round-trip
+// through the json.Marshal path the plugin uses (the outer encoder HTML-escapes
+// to \u003c etc.), so the fix does not change output for valid inputs.
+func TestOrderedSchema_MarshalJSON_HTMLByteParity(t *testing.T) {
+	os := &OrderedSchema{Type: "object", Title: "a<b>&c"}
+	data, err := json.Marshal(os)
+	if err != nil {
+		t.Fatalf("MarshalJSON failed: %v", err)
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if parsed["title"] != "a<b>&c" {
+		t.Errorf("title must round-trip to literal value, got %q", parsed["title"])
+	}
+}
+
 func TestGenerateOrderedSchema_Timestamp(t *testing.T) {
 	g := NewGeneratorWithOptions(true)
 	ordered, err := g.GenerateOrderedSchema((&timestamppb.Timestamp{}).ProtoReflect().Descriptor())
@@ -211,5 +275,25 @@ func TestGenerateOrderedSchema_Timestamp(t *testing.T) {
 	}
 	if len(ordered.Properties) == 0 {
 		t.Error("expected at least one ordered property")
+	}
+}
+
+func TestShouldGenerateSchema_NilOptions(t *testing.T) {
+	if !ShouldGenerateSchema(nil) {
+		t.Error("nil options must enable generation")
+	}
+}
+
+func TestShouldGenerateSchema_AbsentExtension(t *testing.T) {
+	if !ShouldGenerateSchema(&descriptorpb.MessageOptions{}) {
+		t.Error("absent generate_schema extension must enable generation")
+	}
+}
+
+func TestShouldGenerateSchema_ExplicitFalse(t *testing.T) {
+	opts := &descriptorpb.MessageOptions{}
+	proto.SetExtension(opts, jsonschemapb.E_GenerateSchema, false)
+	if ShouldGenerateSchema(opts) {
+		t.Error("generate_schema=false must disable generation")
 	}
 }
