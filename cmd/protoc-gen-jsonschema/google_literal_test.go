@@ -62,7 +62,7 @@ func TestGenerateGoogleSchemaLiteral_PropertiesSorted(t *testing.T) {
 	ia := strings.Index(out, `"alpha"`)
 	im := strings.Index(out, `"mango"`)
 	iz := strings.Index(out, `"zebra"`)
-	if !(ia < im && im < iz) {
+	if ia >= im || im >= iz {
 		t.Errorf("properties must be sorted alpha<mango<zebra, got positions %d,%d,%d", ia, im, iz)
 	}
 }
