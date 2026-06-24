@@ -14,6 +14,12 @@ mcp/jsonschema/jsonschema.pb.go
 buf.lock
 **/buf.lock
 
+# Tool-owned changelog — release-please owns these, reformatting causes
+# spurious diffs on every PR between releases.
+changelog/
+.release-please-manifest.json
+release-please-config.json
+
 # Build output
 dist/
 build/

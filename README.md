@@ -1,6 +1,6 @@
 # protoc-gen-jsonschema
 
-> Convert Protocol Buffers messages into JSON Schema — as a Go library (dynamic) or a protoc/buf plugin (static).
+> Define MCP tool schemas in Protobuf. Convert Protocol Buffers messages into JSON Schema — as a Go library (dynamic) or a protoc/buf plugin (static).
 
 [![BSR](https://img.shields.io/badge/buf.build-sunerpy%2Fprotoc--gen--jsonschema-blue)](https://buf.build/sunerpy/protoc-gen-jsonschema)
 [![Go Reference](https://pkg.go.dev/badge/github.com/sunerpy/protoc-gen-jsonschema.svg)](https://pkg.go.dev/github.com/sunerpy/protoc-gen-jsonschema)
@@ -16,12 +16,15 @@
   - [As a protoc/buf plugin (static)](#as-a-protocbuf-plugin-static)
 - [Plugin options](#plugin-options)
 - [Schema options](#schema-options)
+- [Using with an LLM](#using-with-an-llm)
 - [Performance](#performance)
 - [Development](#development)
 - [License](#license)
 
 ## Features
 
+- **Define MCP tool schemas in proto** — generate the JSON Schema an MCP server
+  advertises as a tool's `inputSchema` straight from your message definitions.
 - Define JSON Schema constraints with Protobuf extension options.
 - Two modes: dynamic generation (library) and static generation (plugin).
 - Field-level and message-level options.
@@ -30,25 +33,44 @@
 
 ## Install
 
+**One-line install (no Go toolchain required):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sunerpy/protoc-gen-jsonschema/main/scripts/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/sunerpy/protoc-gen-jsonschema/main/scripts/install.ps1 | iex
+```
+
+Override the version or destination:
+
+```bash
+PGJ_VERSION=0.0.7 PGJ_INSTALL_DIR=/usr/local/bin \
+  curl -fsSL https://raw.githubusercontent.com/sunerpy/protoc-gen-jsonschema/main/scripts/install.sh | sh
+```
+
+**Prebuilt binary (no pipe-to-shell):**
+
+Download a prebuilt archive for your platform from the
+[Releases page](https://github.com/sunerpy/protoc-gen-jsonschema/releases),
+extract it, and put `protoc-gen-jsonschema` on your `PATH`.
+
 **Go library:**
 
 ```bash
 go get github.com/sunerpy/protoc-gen-jsonschema
 ```
 
-**Plugin binary:**
+**Plugin binary via Go:**
 
 ```bash
 go install github.com/sunerpy/protoc-gen-jsonschema/cmd/protoc-gen-jsonschema@latest
 ```
 
 Make sure `$(go env GOPATH)/bin` is on your `PATH`.
-
-**Prebuilt binary (no Go toolchain required):**
-
-Download a prebuilt archive for your platform from the
-[Releases page](https://github.com/sunerpy/protoc-gen-jsonschema/releases),
-extract it, and put `protoc-gen-jsonschema` on your `PATH`.
 
 **Proto extensions via the Buf Schema Registry (BSR):**
 
@@ -199,6 +221,52 @@ raw    := msg.GetJSONSchemaRawMessage() // json.RawMessage
 > `{seconds, nanos}` object. The proto runtime (`protojson`) itself only accepts
 > the RFC3339 string form; the object branch targets generic JSON consumers.
 
+## Using with an LLM
+
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io) requires each
+tool to advertise an `inputSchema` — a JSON Schema describing its arguments. This
+plugin lets you define that schema in Protobuf and generate it, so your proto
+message is the single source of truth for the tool contract: constraints
+(`required`, `format`, `pattern`, `min_length`, `minimum`, …) become JSON Schema
+keywords the LLM uses to produce valid arguments.
+
+```protobuf
+message SearchToolArgs {
+  option (mcp.jsonschema.title) = "search";
+  option (mcp.jsonschema.message_description) = "Full-text search over the corpus";
+
+  string query = 1 [
+    (mcp.jsonschema.required) = true,
+    (mcp.jsonschema.min_length) = 1,
+    (mcp.jsonschema.description) = "The search query"
+  ];
+  int32 limit = 2 [
+    (mcp.jsonschema.minimum) = 1,
+    (mcp.jsonschema.maximum) = 100,
+    (mcp.jsonschema.example) = "10"
+  ];
+}
+```
+
+Generate the schema once at build time, then hand `GetJSONSchemaBytes()` to your
+MCP server as the tool's `inputSchema` — no hand-written, drift-prone JSON.
+
+Install in one line, then drive the plugin from an agent:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sunerpy/protoc-gen-jsonschema/main/scripts/install.sh | sh
+```
+
+- `protoc --jsonschema_out=. user.proto` — emit JSON Schema files for the messages.
+- `protoc --go_out=. --jsonschema_out=format=go_const:. user.proto` — emit
+  zero-overhead Go constants (`GetJSONSchema()` / `GetJSONSchemaBytes()`), ideal
+  as an MCP tool's `inputSchema`.
+- For runtime use, call `jsonschema.GenerateFromMessage(msg)` — returns a schema
+  ready to `json.Marshal`.
+
+The generated schema is plain JSON (machine-readable); the plugin exits non-zero
+with diagnostics on stderr when a message or option is invalid.
+
 ## Performance
 
 Static access is ~29,000× faster than dynamic generation, and a JSON string
@@ -214,11 +282,18 @@ make lint        # golangci-lint
 make test        # run tests
 make buf-lint    # lint proto files
 make check       # fmt-check + lint + buf-lint + test
-make hooks       # install pre-commit hooks
+make hooks       # install git hooks (fmt+lint on commit, test on push)
 ```
 
-Releases are automated: pushing a `v*` tag triggers CI and publishes the module
-to the BSR via `buf push`.
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org)
+— `feat:`, `fix:`, `feat!:` for breaking changes — which drive automated version
+bumps and the changelog.
+
+Releases are automated via [release-please](https://github.com/googleapis/release-please):
+merging the release PR cuts a `v*` tag, which triggers GoReleaser to build
+multi-platform binaries and publish the GitHub Release. The proto module is
+published to the BSR via `buf push`. The in-repo changelog lives in
+[`changelog/`](changelog/), split by major version.
 
 ## License
 

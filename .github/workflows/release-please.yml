@@ -1,0 +1,27 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Maintains a long-lived release PR that bumps the version and the in-repo
+  # changelog from Conventional Commits. Merging that PR cuts the v* tag, which
+  # triggers the GoReleaser workflow (.github/workflows/release.yml) to build
+  # binaries and publish the GitHub Release. CI runs on the release PR like any
+  # other PR, so a failing release is fixed by pushing to the same PR branch.
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run release-please
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

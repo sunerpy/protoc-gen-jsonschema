@@ -1,19 +1,25 @@
 # See https://pre-commit.com for more information
-# Run `make hooks` (or `pre-commit install`) once to enable.
+# Enable once after cloning:
+#   make hooks   (or: pre-commit install --hook-type pre-commit --hook-type pre-push)
+#
+# Local hooks call `make` so the exact same gate runs locally and in CI.
 repos:
   - repo: local
     hooks:
+      # --- pre-commit: fast formatting + lint, so the committed tree is clean ---
       - id: fmt
         name: fmt
         entry: make fmt
         language: system
         pass_filenames: false
+        stages: [pre-commit]
 
       - id: lint
         name: lint
         entry: make lint
         language: system
         pass_filenames: false
+        stages: [pre-commit]
 
       - id: buf-lint
         name: buf-lint
@@ -21,3 +27,20 @@ repos:
         language: system
         pass_filenames: false
         files: '\.proto$'
+        stages: [pre-commit]
+
+      - id: buf-format
+        name: buf-format
+        entry: make buf-format
+        language: system
+        pass_filenames: false
+        files: '\.proto$'
+        stages: [pre-commit]
+
+      # --- pre-push: slower correctness gate, before code leaves the machine ---
+      - id: test
+        name: test
+        entry: make test
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

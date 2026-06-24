@@ -167,6 +167,15 @@ else
 	@buf format -w
 endif
 
+.PHONY: buf-format-check
+buf-format-check: ## Verify proto formatting without writing (CI gate)
+ifndef HAS_BUF
+	@echo "buf not found. Install: https://buf.build/docs/installation"; exit 1
+else
+	@echo "Checking proto formatting with buf..."
+	@buf format --diff --exit-code
+endif
+
 .PHONY: buf-generate
 buf-generate: ## Run buf generate in the repo root
 ifndef HAS_BUF
@@ -202,8 +211,8 @@ hooks: ## Install the git pre-commit hooks
 ifndef HAS_PRECOMMIT
 	@echo "pre-commit not found. Install: https://pre-commit.com/#install"; exit 1
 else
-	@pre-commit install
-	@echo "pre-commit hooks installed."
+	@pre-commit install --hook-type pre-commit --hook-type pre-push
+	@echo "pre-commit + pre-push hooks installed."
 endif
 
 # ------------------------------------------------------------------------------
@@ -211,5 +220,5 @@ endif
 # ------------------------------------------------------------------------------
 
 .PHONY: check
-check: fmt-check lint buf-lint test ## Run the full local verification suite
+check: fmt-check lint buf-lint buf-format-check test ## Run the full local verification suite
 	@echo "All checks passed."
