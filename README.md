@@ -44,6 +44,12 @@ go install github.com/sunerpy/protoc-gen-jsonschema/cmd/protoc-gen-jsonschema@la
 
 Make sure `$(go env GOPATH)/bin` is on your `PATH`.
 
+**Prebuilt binary (no Go toolchain required):**
+
+Download a prebuilt archive for your platform from the
+[Releases page](https://github.com/sunerpy/protoc-gen-jsonschema/releases),
+extract it, and put `protoc-gen-jsonschema` on your `PATH`.
+
 **Proto extensions via the Buf Schema Registry (BSR):**
 
 The extension definitions are published at

@@ -44,6 +44,11 @@ go install github.com/sunerpy/protoc-gen-jsonschema/cmd/protoc-gen-jsonschema@la
 
 确保 `$(go env GOPATH)/bin` 已加入 `PATH`。
 
+**预编译二进制（无需 Go 工具链）：**
+
+从 [Releases 页面](https://github.com/sunerpy/protoc-gen-jsonschema/releases)
+下载对应平台的归档包，解压后将 `protoc-gen-jsonschema` 放入 `PATH` 即可。
+
 **通过 Buf Schema Registry (BSR) 引入 proto 扩展：**
 
 扩展定义已发布在

@@ -46,3 +46,6 @@ bin/
 
 # Logs
 *.log
+
+# Agent tooling state
+.omo/
