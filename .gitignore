@@ -49,3 +49,6 @@ bin/
 
 # Agent tooling state
 .omo/
+
+# CodeGraph local index
+.codegraph/
