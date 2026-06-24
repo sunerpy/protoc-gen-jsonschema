@@ -218,31 +218,46 @@ func generateMessageConst(g *protogen.GeneratedFile, gen *jsonschema.Generator, 
 	constName := toLowerCamelCase(message.GoIdent.GoName) + "SchemaJSON"
 	typeName := message.GoIdent.GoName
 
-	// Generate GetJSONSchema method
-	g.P("// GetJSONSchema returns the JSON Schema for ", typeName)
-	g.P("// Performance: ~0.29 ns/op, zero memory allocation")
-	g.P("func (*", typeName, ") GetJSONSchema() string {")
-	g.P("\treturn ", constName)
-	g.P("}")
-	g.P()
-
-	// Generate GetJSONSchemaBytes method
-	g.P("// GetJSONSchemaBytes returns the JSON Schema as a byte array")
-	g.P("// Useful for HTTP responses")
-	g.P("// Performance: ~0.34 ns/op, zero memory allocation")
-	g.P("func (*", typeName, ") GetJSONSchemaBytes() []byte {")
-	g.P("\treturn []byte(", constName, ")")
-	g.P("}")
-	g.P()
-
-	// Generate GetJSONSchemaRawMessage method
-	g.P("// GetJSONSchemaRawMessage returns the JSON Schema as json.RawMessage")
-	g.P("// Useful for JSON encoding without additional escaping")
-	g.P("// Performance: ~0.34 ns/op, zero memory allocation")
-	g.P("func (*", typeName, ") GetJSONSchemaRawMessage() json.RawMessage {")
-	g.P("\treturn json.RawMessage(", constName, ")")
-	g.P("}")
-	g.P()
+	for _, m := range []struct {
+		comments []string
+		sig      string
+		ret      string
+	}{
+		{
+			[]string{
+				"// GetJSONSchema returns the JSON Schema for " + typeName,
+				"// Performance: ~0.29 ns/op, zero memory allocation",
+			},
+			"GetJSONSchema() string",
+			constName,
+		},
+		{
+			[]string{
+				"// GetJSONSchemaBytes returns the JSON Schema as a byte array",
+				"// Useful for HTTP responses",
+				"// Performance: ~0.34 ns/op, zero memory allocation",
+			},
+			"GetJSONSchemaBytes() []byte",
+			"[]byte(" + constName + ")",
+		},
+		{
+			[]string{
+				"// GetJSONSchemaRawMessage returns the JSON Schema as json.RawMessage",
+				"// Useful for JSON encoding without additional escaping",
+				"// Performance: ~0.34 ns/op, zero memory allocation",
+			},
+			"GetJSONSchemaRawMessage() json.RawMessage",
+			"json.RawMessage(" + constName + ")",
+		},
+	} {
+		for _, c := range m.comments {
+			g.P(c)
+		}
+		g.P("func (*", typeName, ") ", m.sig, " {")
+		g.P("\treturn ", m.ret)
+		g.P("}")
+		g.P()
+	}
 
 	// Generate constant
 	g.P("const ", constName, " = `", jsonStr, "`")
