@@ -266,18 +266,16 @@ func (g *Generator) generateFieldSchema(field protoreflect.FieldDescriptor, opts
 	}
 
 	// Apply custom options
-	if proto.HasExtension(opts, jsonschemapb.E_Description) {
-		schema["description"] = proto.GetExtension(opts, jsonschemapb.E_Description).(string)
-	}
+	applyExt[string](schema, opts, "description", jsonschemapb.E_Description)
+	applyExt[string](schema, opts, "example", jsonschemapb.E_Example)
+	applyExt[string](schema, opts, "format", jsonschemapb.E_Format)
+	applyExt[int32](schema, opts, "minLength", jsonschemapb.E_MinLength)
+	applyExt[int32](schema, opts, "maxLength", jsonschemapb.E_MaxLength)
+	applyExt[float64](schema, opts, "minimum", jsonschemapb.E_Minimum)
+	applyExt[float64](schema, opts, "maximum", jsonschemapb.E_Maximum)
+	applyExt[string](schema, opts, "pattern", jsonschemapb.E_Pattern)
 
-	if proto.HasExtension(opts, jsonschemapb.E_Example) {
-		schema["example"] = proto.GetExtension(opts, jsonschemapb.E_Example).(string)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_Format) {
-		schema["format"] = proto.GetExtension(opts, jsonschemapb.E_Format).(string)
-	}
-
+	// default is special: its string payload is parsed as JSON and skipped on error.
 	if proto.HasExtension(opts, jsonschemapb.E_Default) {
 		defaultStr := proto.GetExtension(opts, jsonschemapb.E_Default).(string)
 		var defaultValue interface{}
@@ -286,27 +284,16 @@ func (g *Generator) generateFieldSchema(field protoreflect.FieldDescriptor, opts
 		}
 	}
 
-	if proto.HasExtension(opts, jsonschemapb.E_MinLength) {
-		schema["minLength"] = proto.GetExtension(opts, jsonschemapb.E_MinLength).(int32)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_MaxLength) {
-		schema["maxLength"] = proto.GetExtension(opts, jsonschemapb.E_MaxLength).(int32)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_Minimum) {
-		schema["minimum"] = proto.GetExtension(opts, jsonschemapb.E_Minimum).(float64)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_Maximum) {
-		schema["maximum"] = proto.GetExtension(opts, jsonschemapb.E_Maximum).(float64)
-	}
-
-	if proto.HasExtension(opts, jsonschemapb.E_Pattern) {
-		schema["pattern"] = proto.GetExtension(opts, jsonschemapb.E_Pattern).(string)
-	}
-
 	return schema
+}
+
+// applyExt copies a present field-option extension of type T into schema[key],
+// preserving the extension's exact Go type (string/int32/float64) so downstream
+// type assertions and generated literals stay byte-stable.
+func applyExt[T any](schema Schema, opts *descriptorpb.FieldOptions, key string, ext protoreflect.ExtensionType) {
+	if proto.HasExtension(opts, ext) {
+		schema[key] = proto.GetExtension(opts, ext).(T)
+	}
 }
 
 // ToJSON converts schema to JSON string
