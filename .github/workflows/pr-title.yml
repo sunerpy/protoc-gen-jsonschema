@@ -1,0 +1,34 @@
+name: PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  # The repo squash policy uses the PR title as the squash commit subject, and
+  # release-please parses that subject to decide the version bump. So every PR
+  # title MUST be a valid Conventional Commit, or releases silently stop bumping.
+  lint:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            chore
+            refactor
+            perf
+            test
+            build
+            ci
+            style
+            revert
