@@ -202,8 +202,8 @@ hooks: ## Install the git pre-commit hooks
 ifndef HAS_PRECOMMIT
 	@echo "pre-commit not found. Install: https://pre-commit.com/#install"; exit 1
 else
-	@pre-commit install
-	@echo "pre-commit hooks installed."
+	@pre-commit install --hook-type pre-commit --hook-type pre-push
+	@echo "pre-commit + pre-push hooks installed."
 endif
 
 # ------------------------------------------------------------------------------

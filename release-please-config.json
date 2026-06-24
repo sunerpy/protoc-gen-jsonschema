@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "include-component-in-tag": false,
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "protoc-gen-jsonschema",
+      "bump-minor-pre-major": true,
+      "include-v-in-tag": true,
+      "draft": false,
+      "changelog-path": "changelog/CHANGELOG-v0.x.md"
+    }
+  }
+}
