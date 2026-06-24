@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package example;
 
-option go_package = "example/pb;pb";
-
 import "mcp/jsonschema/jsonschema.proto";
+
+option go_package = "example/pb;pb";
 
 message UserRequest {
   option (mcp.jsonschema.title) = "User Request";
@@ -17,7 +17,7 @@ message UserRequest {
     (mcp.jsonschema.description) = "User's email address",
     (mcp.jsonschema.example) = "user@example.com"
   ];
-  
+
   // User's full name (3-50 characters)
   string name = 2 [
     (mcp.jsonschema.required) = true,
@@ -26,14 +26,14 @@ message UserRequest {
     (mcp.jsonschema.description) = "User's full name",
     (mcp.jsonschema.example) = "John Doe"
   ];
-  
+
   // User's age (must be 18-120)
   int32 age = 3 [
     (mcp.jsonschema.minimum) = 18,
     (mcp.jsonschema.maximum) = 120,
     (mcp.jsonschema.description) = "User's age in years"
   ];
-  
+
   // User's phone number (optional)
   string phone = 4 [
     (mcp.jsonschema.pattern) = "^\\+?[1-9]\\d{1,14}$",
@@ -42,7 +42,7 @@ message UserRequest {
   ];
 }
 
-message ProductRequest { 
+message ProductRequest {
   option (mcp.jsonschema.title) = "Product Request";
   option (mcp.jsonschema.message_description) = "Request to create or update a product";
   string name = 1 [

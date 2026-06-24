@@ -29,6 +29,14 @@ repos:
         files: '\.proto$'
         stages: [pre-commit]
 
+      - id: buf-format
+        name: buf-format
+        entry: make buf-format
+        language: system
+        pass_filenames: false
+        files: '\.proto$'
+        stages: [pre-commit]
+
       # --- pre-push: slower correctness gate, before code leaves the machine ---
       - id: test
         name: test

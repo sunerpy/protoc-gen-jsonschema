@@ -167,6 +167,15 @@ else
 	@buf format -w
 endif
 
+.PHONY: buf-format-check
+buf-format-check: ## Verify proto formatting without writing (CI gate)
+ifndef HAS_BUF
+	@echo "buf not found. Install: https://buf.build/docs/installation"; exit 1
+else
+	@echo "Checking proto formatting with buf..."
+	@buf format --diff --exit-code
+endif
+
 .PHONY: buf-generate
 buf-generate: ## Run buf generate in the repo root
 ifndef HAS_BUF
@@ -211,5 +220,5 @@ endif
 # ------------------------------------------------------------------------------
 
 .PHONY: check
-check: fmt-check lint buf-lint test ## Run the full local verification suite
+check: fmt-check lint buf-lint buf-format-check test ## Run the full local verification suite
 	@echo "All checks passed."
