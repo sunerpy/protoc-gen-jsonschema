@@ -85,7 +85,24 @@ func (g *Generator) GenerateOrderedSchema(md protoreflect.MessageDescriptor) (*O
 	}
 
 	// Process fields in order
-	fields := md.Fields()
+	g.forEachVisibleField(md.Fields(), func(name string, fieldSchema Schema, required bool) {
+		orderedSchema.Properties = append(orderedSchema.Properties, OrderedProperty{
+			Name:   name,
+			Schema: fieldSchema,
+		})
+		if required {
+			orderedSchema.Required = append(orderedSchema.Required, name)
+		}
+	})
+
+	return orderedSchema, nil
+}
+
+// forEachVisibleField walks fields in descriptor order, skips hidden ones, and
+// invokes fn with each field's resolved JSON name, generated schema, and
+// required flag. Shared by the map and ordered schema paths so name resolution,
+// hidden-skip, and required detection cannot drift between them.
+func (g *Generator) forEachVisibleField(fields protoreflect.FieldDescriptors, fn func(name string, schema Schema, required bool)) {
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
 		fieldOpts := field.Options().(*descriptorpb.FieldOptions)
@@ -94,20 +111,8 @@ func (g *Generator) GenerateOrderedSchema(md protoreflect.MessageDescriptor) (*O
 			continue
 		}
 
-		fieldName := g.getFieldName(field, fieldOpts)
-		fieldSchema := g.generateFieldSchema(field, fieldOpts)
-
-		orderedSchema.Properties = append(orderedSchema.Properties, OrderedProperty{
-			Name:   fieldName,
-			Schema: fieldSchema,
-		})
-
-		if g.isFieldRequired(fieldOpts) {
-			orderedSchema.Required = append(orderedSchema.Required, fieldName)
-		}
+		fn(g.getFieldName(field, fieldOpts), g.generateFieldSchema(field, fieldOpts), g.isFieldRequired(fieldOpts))
 	}
-
-	return orderedSchema, nil
 }
 
 // shouldGenerateSchema checks if schema generation is enabled
@@ -147,22 +152,12 @@ func (g *Generator) processFields(fields protoreflect.FieldDescriptors) (map[str
 	properties := make(map[string]interface{})
 	required := []string{}
 
-	for i := 0; i < fields.Len(); i++ {
-		field := fields.Get(i)
-		fieldOpts := field.Options().(*descriptorpb.FieldOptions)
-
-		if g.isFieldHidden(fieldOpts) {
-			continue
+	g.forEachVisibleField(fields, func(name string, fieldSchema Schema, isRequired bool) {
+		properties[name] = fieldSchema
+		if isRequired {
+			required = append(required, name)
 		}
-
-		fieldName := g.getFieldName(field, fieldOpts)
-		fieldSchema := g.generateFieldSchema(field, fieldOpts)
-		properties[fieldName] = fieldSchema
-
-		if g.isFieldRequired(fieldOpts) {
-			required = append(required, fieldName)
-		}
-	}
+	})
 
 	return properties, required
 }
