@@ -17,21 +17,17 @@ type Schema map[string]interface{}
 
 // Generator generates JSON Schema from protobuf messages
 type Generator struct {
-	schemas       map[string]Schema
 	preserveOrder bool
 }
 
 // NewGenerator creates a new Generator
 func NewGenerator() *Generator {
-	return &Generator{
-		schemas: make(map[string]Schema),
-	}
+	return &Generator{}
 }
 
 // NewGeneratorWithOptions creates a new Generator with options
 func NewGeneratorWithOptions(preserveOrder bool) *Generator {
 	return &Generator{
-		schemas:       make(map[string]Schema),
 		preserveOrder: preserveOrder,
 	}
 }
@@ -293,9 +289,9 @@ func applyExt[T any](schema Schema, opts *descriptorpb.FieldOptions, key string,
 
 // ToJSON converts schema to JSON string
 func (s Schema) ToJSON() (string, error) {
-	data, err := json.MarshalIndent(s, "", "  ")
+	data, err := s.ToJSONBytes()
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal schema: %w", err)
+		return "", err
 	}
 	return string(data), nil
 }
