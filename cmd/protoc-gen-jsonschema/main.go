@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
@@ -465,12 +466,38 @@ func generateGoogleSchemaLiteral(m map[string]interface{}, indent int) string {
 		sb.WriteString("},\n")
 	}
 
-	// Properties
+	// Examples (our JSON emits a singular string "example"; v0.3.0 has only Examples []any)
+	if example, ok := m["example"].(string); ok {
+		sb.WriteString(indentStr)
+		fmt.Fprintf(&sb, "Examples: []any{%q},\n", example)
+	}
+
+	// Default is stored as json.RawMessage of the compact-encoded value
+	if def, ok := m["default"]; ok {
+		if raw, err := json.Marshal(def); err == nil {
+			sb.WriteString(indentStr)
+			fmt.Fprintf(&sb, "Default: json.RawMessage(%q),\n", string(raw))
+		}
+	}
+
+	// AdditionalProperties: only the explicit `false` case is representable;
+	// falseSchema() is unexported, so emit the equivalent &Schema{Not: &Schema{}}.
+	if ap, ok := m["additionalProperties"].(bool); ok && !ap {
+		sb.WriteString(indentStr)
+		sb.WriteString("AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},\n")
+	}
+
+	// Properties (sorted so generated output is deterministic across runs)
 	if props, ok := m["properties"].(map[string]interface{}); ok && len(props) > 0 {
 		sb.WriteString(indentStr)
 		sb.WriteString("Properties: map[string]*jsonschema.Schema{\n")
-		for key, val := range props {
-			if propMap, ok := val.(map[string]interface{}); ok {
+		keys := make([]string, 0, len(props))
+		for key := range props {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if propMap, ok := props[key].(map[string]interface{}); ok {
 				sb.WriteString(strings.Repeat("\t", indent+2))
 				fmt.Fprintf(&sb, "%q: ", key)
 				sb.WriteString(generateGoogleSchemaLiteral(propMap, indent+2))
@@ -500,6 +527,21 @@ func generateGoogleSchemaLiteral(m map[string]interface{}, indent int) string {
 		sb.WriteString("Items: ")
 		sb.WriteString(generateGoogleSchemaLiteral(items, indent+1))
 		sb.WriteString(",\n")
+	}
+
+	// OneOf (e.g. google.protobuf.Timestamp string-or-object)
+	if oneOf, ok := m["oneOf"].([]interface{}); ok && len(oneOf) > 0 {
+		sb.WriteString(indentStr)
+		sb.WriteString("OneOf: []*jsonschema.Schema{\n")
+		for _, branch := range oneOf {
+			if branchMap, ok := branch.(map[string]interface{}); ok {
+				sb.WriteString(strings.Repeat("\t", indent+2))
+				sb.WriteString(generateGoogleSchemaLiteral(branchMap, indent+2))
+				sb.WriteString(",\n")
+			}
+		}
+		sb.WriteString(indentStr)
+		sb.WriteString("},\n")
 	}
 
 	sb.WriteString(strings.Repeat("\t", indent))
