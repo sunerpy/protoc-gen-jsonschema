@@ -351,9 +351,10 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 
 	// type
 	if os.Type != "" {
-		buf.WriteString(`"type":"`)
-		buf.WriteString(os.Type)
-		buf.WriteString(`"`)
+		buf.WriteString(`"type":`)
+		if err := writeJSONString(&buf, os.Type); err != nil {
+			return nil, err
+		}
 		first = false
 	}
 
@@ -362,9 +363,10 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		if !first {
 			buf.WriteString(",")
 		}
-		buf.WriteString(`"title":"`)
-		buf.WriteString(os.Title)
-		buf.WriteString(`"`)
+		buf.WriteString(`"title":`)
+		if err := writeJSONString(&buf, os.Title); err != nil {
+			return nil, err
+		}
 		first = false
 	}
 
@@ -373,9 +375,10 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 		if !first {
 			buf.WriteString(",")
 		}
-		buf.WriteString(`"description":"`)
-		buf.WriteString(os.Description)
-		buf.WriteString(`"`)
+		buf.WriteString(`"description":`)
+		if err := writeJSONString(&buf, os.Description); err != nil {
+			return nil, err
+		}
 		first = false
 	}
 
@@ -389,9 +392,10 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 			if i > 0 {
 				buf.WriteString(",")
 			}
-			buf.WriteString(`"`)
-			buf.WriteString(prop.Name)
-			buf.WriteString(`":`)
+			if err := writeJSONString(&buf, prop.Name); err != nil {
+				return nil, err
+			}
+			buf.WriteString(`:`)
 			propJSON, err := json.Marshal(prop.Schema)
 			if err != nil {
 				return nil, err
@@ -417,6 +421,20 @@ func (os *OrderedSchema) MarshalJSON() ([]byte, error) {
 
 	buf.WriteString("}")
 	return []byte(buf.String()), nil
+}
+
+// writeJSONString encodes s as a JSON string into buf, escaping it correctly
+// while keeping <, >, and & literal (SetEscapeHTML(false)) so output stays
+// byte-identical for values without quotes/backslashes/control characters.
+func writeJSONString(buf *strings.Builder, s string) error {
+	var enc strings.Builder
+	e := json.NewEncoder(&enc)
+	e.SetEscapeHTML(false)
+	if err := e.Encode(s); err != nil {
+		return err
+	}
+	buf.WriteString(strings.TrimRight(enc.String(), "\n"))
+	return nil
 }
 
 // GenerateFromMessage generates JSON Schema from a protobuf message
